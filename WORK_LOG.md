@@ -1790,3 +1790,11 @@
 - 新規 .local/tryout/20261123-183929-66ba7f/Tanayomi.Desktop.exe を非管理者の利用者権限で作成。非data8189全SHA一致。Desktop720A67118DA06194BC1C26E309FF39C4A0B36D8709B8EE6A169F13D7CF2F0CD6、core2F6EF80F35AAC70E5FABED6FC713EF9C7C6AE2F2D842766FCCD7E8BD65A41CC4。既存data/版保護、native一時物清掃済み。
 - 利用者が終了後GitHub pushを明示承認、remoteはhosinohito/tanayomi.gitでrefsなしを確認。Gitをmainで初期化、localのみGCM/wincredman設定。公開実行物と本体ライセンスは別途保留。240ソース/文書/許諾付きassetをstage、生成物/秘密設定除外を確認。GitHub CLI未導入のためWindows資格情報に直接保存するregister-github-token.ps1を用意、伏字入力→stdin、平文ファイル/引数なし。利用者は登録済み。pwsh PATH未登録には実在するCodex同梱PowerShell絶対パスを案内。Git通常sandboxは所有者不一致で拒否、同一利用者権限へ切替しglobal safe.directoryは変更せず。pushはこの後実行。
 <!-- WORK_LOG_ENTRY_END -->
+
+<!-- WORK_LOG_ENTRY -->
+## 20261123-06 — 2026-11-23 18:43:41 +09:00
+
+- 間延びモードの実装/検証/新copy完成後、指定GitHubのmainへ初回commit cab389e0a9a21da2ba15f2a5e824c6d4d87c17f0をpush成功。Windows資格情報マネージャーの認証を利用し、トークン表示/平文ファイル保存なし。240正式ソース/試験/文書/許諾付き原本assetのみ、.local/生成物/利用者dataを除外。
+- 旧履歴やAGENTSの既存CRLF由来whitespace指摘は、無関係な全文書整形で変更しなかった。公開実行物・本体ライセンス選択は未実施。今回の明示的ソースpush承認だけを実行。
+- 最新exeは .local/tryout/20261123-183929-66ba7f/Tanayomi.Desktop.exe。全照合成功、追加試験/再build不要。CURRENT_TASK/PROJECT_STATUSをpush済みへ更新し、この完了記録も追記commit/pushしてremote一致を確認する。機能追加とGitHubpush依頼は完了、R26等の既存保留/継続条件は維持。build/test/agent非稼働。
+<!-- WORK_LOG_ENTRY_END -->

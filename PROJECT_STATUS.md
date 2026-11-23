@@ -81,7 +81,7 @@ S0/S2と既存内蔵方式を統合済み。S1外部標準チェーンは2026-11
 
 ## 未完作業の順序
 
-2026-11-23追加：OpenVoice専用『間延びモード』を既定OFF・次発言適用・保存復元で実装。共通2679/native40/製品NIT79+plan6成功、旧39.795秒/通常9.770秒の切替を確認。新183929-66ba7f版作成/非data8189全SHA一致。その後ユーザー指定 https://github.com/hosinohito/tanayomi.git へソースと文書をpushする承認あり。本体ライセンス未決・実行物公開配布保留は維持し、今回のソースpushとは区別する。Windows資格情報登録スクリプトを提供、利用者は登録済みと回答。
+2026-11-23追加：OpenVoice専用『間延びモード』を既定OFF・次発言適用・保存復元で実装。共通2679/native40/製品NIT79+plan6成功、旧39.795秒/通常9.770秒の切替を確認。新183929-66ba7f版作成/非data8189全SHA一致。ユーザー指定 https://github.com/hosinohito/tanayomi.git のmainへソースと文書の初回push完了（cab389e）。本体ライセンス未決・実行物公開配布保留は維持し、今回のソースpushとは区別する。Windows資格情報登録スクリプトを提供、利用者は登録済みと回答。
 
 
 2026-11-23最優先：NIT＋OpenVoice/hosinohitoの長めの発音が間延びする報告。利用者の再現文はNIT39.795秒/OpenVoice39.787秒。固定NITのduration treeが長いbreathの8個目以降のaccent句を106framesのPDF196へ振り分ける問題を特定。既存accent境界への短休止追加を実装し、原文NIT9.770秒/OpenVoice9.764秒へ改善。共通/native/製品/UTAU回帰成功。利用者が修正音声に「治った」と回答し、今回の再現不具合は解決済み。新規181159-40decb版作成・非data8189全SHA確認済み。不要な開発重複約5GBは照合後清掃、既存版/data保持。
