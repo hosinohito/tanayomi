@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tanayomi.Tests" />
+    <InternalsVisibleTo Include="Tanayomi.Desktop" />
+    <EmbeddedResource Include="../../assets/hosinohito.zip" LogicalName="Tanayomi.hosinohito.zip" />
+    <EmbeddedResource Include="../../assets/naist-jdic.bin.gz" LogicalName="Tanayomi.naist-jdic.bin.gz" />
+    <EmbeddedResource Include="../../assets/naist-jdic.COPYING" LogicalName="Tanayomi.naist-jdic.COPYING" />
+    <None Include="../../assets/naist-jdic.COPYING" Link="naist-jdic.COPYING" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/ui-third-party-NOTICES.txt" Link="licenses/ui-third-party-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="$(AvaloniaVersion)" />
+  </ItemGroup>
+</Project>

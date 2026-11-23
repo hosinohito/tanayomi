@@ -1,0 +1,16 @@
+Ooura FFT package
+Original author and permission source:
+https://www.kurims.kyoto-u.ac.jp/~ooura/fft.html
+
+Copyright Takuya OOURA, 1996-2001
+
+You may use, copy, modify and distribute this code for any purpose (include commercial use) and without fee. Please refer to this package when you modify this code.
+
+WORLD's src/fft.cpp contains Ooura's FFT implementation and wrappers by M. Morise.
+Pinned source: https://github.com/mmorise/World/blob/d625e7608ca23a870018f01e7c562ac683d9847f/src/fft.cpp
+WORLD revision: d625e7608ca23a870018f01e7c562ac683d9847f
+WORLD's original attribution identifies the implementation as Mr. Ooura's and
+links https://www.kurims.kyoto-u.ac.jp/~ooura/index.html . Its mention of FFTW
+describes the wrapper interface; this build does not include or link FFTW.
+The accompanying WORLD/M. Morise and shared-header notices are retained in
+world-LICENSE.txt. No upstream source is modified by this build.

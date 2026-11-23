@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "bert": {
+    "model_fp16.onnx": "23f633ae7c5900ff82b35a428b67a54e7e7911d5d6a6dcfc77967be8f1c94dc6",
+    "config.json": "8f387ab4c6b36e47c7071327c7a42099002781279b00a7e6a7fe88f3da237a3f",
+    "tokenizer.json": "21a17e4d0032739e82dc60f155b4ae37e94519103e0d399657fdd249ec3e7905",
+    "tokenizer_config.json": "1cc5203f09ecac12bb7a98a05cb9c2e39a9e37a113a7d85d12542ef29190583b",
+    "special_tokens_map.json": "b6d346be366a7d1d48332dbc9fdf3bf8960b5d879522b7799ddba59e76237ee3",
+    "vocab.txt": "902cbd7e218aaf23a72955533293ceac12fcc4e010ad98c0c14757b94ce7abb6"
+  },
+  "voices": [
+    {
+      "id": "aivis-aida-shigeru",
+      "name": "阿井田 茂 (AivisSpeech)",
+      "model": "47e53151-a378-46f3-abee-ce13aa07feb1",
+      "speaker": "561e4e59-3bc9-4726-9028-44a3c12a6f1d",
+      "version": "1.0.0",
+      "style": 0,
+      "sourceSha256": "6dabe29de5ec2c1715e12a430805e1bff6ec64a315cccec2d26fad029df83243",
+      "credit": "阿井田 茂（制作・CV 古山キリヲ） / AivisSpeech Engine",
+      "usage": "ACML 1.0。合成音声です。なりすまし、実在する人物・団体・商品などへの批判や攻撃を目的とする活動、政治・宗教などへの賛否を呼びかける活動等は禁止です。詳細は利用条件を確認してください。",
+      "termsUrl": "https://github.com/Aivis-Project/ACML/blob/867c0a1198686fdbf6ae14d1b067df828dd721df/ACML-1.0.md"
+    },
+    {
+      "id": "aivis-sawabaru-genjiro",
+      "name": "澤原 玄二郎 (AivisSpeech)",
+      "model": "2e1fdde8-d089-42d7-b64f-cf89952b1bdc",
+      "speaker": "accf08c8-0237-485f-98af-20b71cf2121b",
+      "version": "1.0.0",
+      "style": 0,
+      "sourceSha256": "a17a053af538d51ec6294473f2d30e85580a05154bee56e0d6788dcf118f8c1f",
+      "credit": "澤原 玄二郎（制作・CV 古山キリヲ） / AivisSpeech Engine",
+      "usage": "ACML 1.0。合成音声です。なりすまし、実在する人物・団体・商品などへの批判や攻撃を目的とする活動、政治・宗教などへの賛否を呼びかける活動等は禁止です。詳細は利用条件を確認してください。",
+      "termsUrl": "https://github.com/Aivis-Project/ACML/blob/867c0a1198686fdbf6ae14d1b067df828dd721df/ACML-1.0.md"
+    },
+    {
+      "id": "aivis-morioki",
+      "name": "morioki (AivisSpeech)",
+      "model": "baaae3c0-7b22-4605-8ba5-80c959b41a48",
+      "speaker": "396a746d-742f-4e43-b722-1182a7fab9af",
+      "version": "1.0.0",
+      "style": 0,
+      "sourceSha256": "352858a737b23fe0bd0b7bd73a4956be262aad9bb24a7bf0d1eae9a71a466469",
+      "credit": "morioki（モデル制作 yuki、音声提供 もりおき） / AivisSpeech Engine",
+      "usage": "ACML 1.0。合成音声です。なりすまし、実在する人物・団体・商品などへの批判や攻撃を目的とする活動、政治・宗教などへの賛否を呼びかける活動等は禁止です。詳細は利用条件を確認してください。",
+      "termsUrl": "https://github.com/Aivis-Project/ACML/blob/867c0a1198686fdbf6ae14d1b067df828dd721df/ACML-1.0.md"
+    },
+    {
+      "id": "aivis-yuia-naru",
+      "name": "結亜ナル (AivisSpeech)",
+      "model": "b79c40e4-8a5e-4f20-802c-2c0eba2f0983",
+      "speaker": "75448b2c-f5ab-4703-864f-517d0b4cad8d",
+      "version": "0.2.0",
+      "style": 0,
+      "sourceSha256": "7cb87a8915569f2e689106ddc4ab23f8174fae78bbbffc7733d4be2e27743e34",
+      "credit": "結亜ナル（ゆうしゃアシスタント） / AivisSpeech Engine",
+      "usage": "CC0。合成音声です。",
+      "termsUrl": "https://creativecommons.org/publicdomain/zero/1.0/"
+    }
+  ]
+}

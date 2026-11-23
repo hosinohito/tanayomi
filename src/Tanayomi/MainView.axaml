@@ -1,0 +1,124 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:Tanayomi" x:Class="Tanayomi.MainView" x:DataType="local:MainViewModel" Background="#0D1522">
+  <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Margin="24" Spacing="20" MaxWidth="1000">
+      <TextBlock Text="たなよみ" FontSize="30" FontWeight="Bold" Margin="2,8,2,4" />
+      <Border Classes="card">
+        <StackPanel Spacing="14">
+          <TextBlock Text="接続" Classes="heading" />
+          <TabControl>
+            <TabItem Header="Twitch"><StackPanel Spacing="10" Margin="0,12,0,0">
+              <TextBox Text="{Binding TwitchChannel}" PlaceholderText="チャンネル名（空欄なら自分のチャンネル）" />
+              <WrapPanel>
+                <Button Content="{Binding ConnectLabel}" Click="ConnectTwitch" IsEnabled="{Binding CanAuthenticate}" Classes="primary" Margin="0,0,8,8" />
+                <Button Content="認証なしで接続" Command="{Binding ConnectAnonymousCommand}" Margin="0,0,8,8" />
+                <Button Content="切断" Command="{Binding DisconnectTwitchCommand}" Margin="0,0,0,8" />
+              </WrapPanel>
+              <TextBlock Text="{Binding AuthenticationStatus}" Classes="muted" TextWrapping="Wrap" FontSize="12" />
+              <TextBlock Text="{Binding TwitchStatus}" Classes="muted" TextWrapping="Wrap" />
+              <Expander Header="接続の詳細・認証の管理" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="8" Margin="0,8,0,0">
+                  <TextBlock Text="認証なし接続にはチャンネル名が必要です。" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                  <CheckBox x:Name="EventSubToggle" IsChecked="{Binding UseEventSub}" Content="認証接続でEventSubも併用する" />
+                  <TextBox Text="{Binding TwitchToken}" PasswordChar="●" PlaceholderText="OAuthトークン、または認証後のURL" />
+                  <StackPanel x:Name="EventSubSettings" IsVisible="{Binding UseEventSub}" Spacing="6">
+                    <TextBox Text="{Binding TwitchClientId}" PlaceholderText="TwitchアプリのクライアントID" />
+                  </StackPanel>
+                  <WrapPanel>
+                    <Button Content="別のアカウントで認証" Click="AuthenticateTwitch" IsEnabled="{Binding CanAuthenticate}" Margin="0,0,8,8" />
+                    <Button Content="保存した認証を削除" Click="ForgetTwitch" IsEnabled="{Binding CanAuthenticate}" Margin="0,0,0,8" />
+                  </WrapPanel>
+                </StackPanel>
+              </Expander>
+            </StackPanel></TabItem>
+            <TabItem Header="YouTube"><StackPanel Spacing="10" Margin="0,12,0,0">
+              <TextBox Text="{Binding YouTubeVideo}" PlaceholderText="ライブ配信の動画ID" />
+              <TextBox Text="{Binding YouTubeKey}" PasswordChar="●" PlaceholderText="YouTube Data APIキー" />
+              <WrapPanel><Button Content="YouTubeに接続" Command="{Binding ConnectYouTubeCommand}" Classes="primary" Margin="0,0,8,8" /><Button Content="切断" Command="{Binding DisconnectYouTubeCommand}" Margin="0,0,0,8" /></WrapPanel>
+              <TextBlock Text="{Binding YouTubeStatus}" Classes="muted" TextWrapping="Wrap" />
+            </StackPanel></TabItem>
+          </TabControl>
+        </StackPanel>
+      </Border>
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="Auto,*"><TextBlock Text="読み上げ" Classes="heading" /><TextBlock Grid.Column="1" Text="{Binding VoiceName}" Classes="muted" VerticalAlignment="Center" TextWrapping="Wrap" TextAlignment="Right" Margin="12,0,0,0" /></Grid>
+          <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+            <TextBlock Text="音量" VerticalAlignment="Center" />
+            <Slider x:Name="PlaybackVolumeSlider" Grid.Column="1" Minimum="0" Maximum="400" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding VolumePercent, Mode=TwoWay}" VerticalAlignment="Center" />
+            <TextBlock x:Name="PlaybackVolumeLabel" Grid.Column="2" Text="{Binding VolumeLabel}" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Text="音量は次に読み始める発言から適用します。100%を超えると音割れする場合があります。" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+          <ToggleButton x:Name="RandomVoiceToggle" Content="発言ごとに音声をランダム選択" IsChecked="{Binding RandomVoiceEnabled, Mode=TwoWay}" HorizontalAlignment="Left" />
+          <SelectableTextBlock Text="{Binding RandomVoiceDetails}" IsVisible="{Binding RandomVoiceEnabled}" TextWrapping="Wrap" FontSize="12" />
+          <TextBlock Text="{Binding VolumeSettingsStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+          <CheckBox x:Name="UtauToggle" IsChecked="{Binding UseUtau}" IsEnabled="{Binding UtauAvailable}" Content="このUTAU音源で読み上げる" />
+          <ComboBox ItemsSource="{Binding Voicebanks}" SelectedItem="{Binding SelectedVoicebank}" HorizontalAlignment="Stretch" PlaceholderText="取り込んだ音源" />
+          <TextBlock Text="UTAUの合成方式" />
+          <ComboBox x:Name="UtauModeSelector" ItemsSource="{Binding UtauModes}" SelectedItem="{Binding SelectedUtauMode}" HorizontalAlignment="Stretch" IsEnabled="{Binding UtauAvailable}" />
+          <StackPanel IsVisible="{Binding ShowDrawnOutMode}" Spacing="6">
+            <CheckBox x:Name="DrawnOutModeToggle" Content="間延びモード" IsChecked="{Binding DrawnOutMode, Mode=TwoWay}" />
+            <TextBlock Text="次に合成する発言から、長文が間延びする従来の読み方を使います。" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding DrawnOutSettingsStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+          </StackPanel>
+          <CheckBox x:Name="OpenJtalkToggle" Content="同梱の日本語音声で読み上げる" IsChecked="{Binding UseOpenJtalk}" IsVisible="{Binding OpenJtalkAvailable}" />
+          <ComboBox x:Name="OpenJtalkVoiceSelector" ItemsSource="{Binding OpenJtalkVoices}" SelectedItem="{Binding SelectedOpenJtalkVoice}" IsVisible="{Binding OpenJtalkAvailable}" HorizontalAlignment="Stretch" />
+          <SelectableTextBlock Text="{Binding SelectedVoiceTerms}" IsVisible="{Binding HasSelectedVoiceTerms}" TextWrapping="Wrap" FontSize="12" />
+          <StackPanel x:Name="VoiceTermsPanel" IsVisible="{Binding HasVoiceTermsText}" Spacing="8">
+            <TextBlock x:Name="VoiceAcceptanceStatusText" Text="{Binding VoiceAcceptanceStatus}" TextWrapping="Wrap" />
+            <Expander x:Name="VoiceTermsExpander" Header="Supertonic 3 の利用条件全文" IsExpanded="{Binding VoiceTermsOpen, Mode=TwoWay}" HorizontalAlignment="Stretch">
+              <StackPanel Spacing="8" Margin="0,8,0,0">
+                <ScrollViewer MaxHeight="260" HorizontalScrollBarVisibility="Disabled">
+                  <SelectableTextBlock x:Name="VoiceTermsFullText" Text="{Binding VoiceTermsText}" TextWrapping="Wrap" />
+                </ScrollViewer>
+                <Button x:Name="AcceptVoiceTermsButton" Content="利用条件に同意する" Command="{Binding AcceptVoiceTermsCommand}" IsVisible="{Binding VoiceAcceptanceRequired}" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Expander>
+          </StackPanel>
+          <TextBox Text="{Binding TestText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="76" PlaceholderText="読み上げたい文章を入力" />
+          <WrapPanel><Button Content="読み上げる" Command="{Binding SpeakCommand}" Classes="primary" Margin="0,0,8,8" /><Button Content="今の発言をスキップ" Command="{Binding SkipCommand}" Margin="0,0,8,8" /><Button Content="すべて停止" Command="{Binding ClearCommand}" Margin="0,0,0,8" /></WrapPanel>
+          <TextBlock Text="{Binding SpeechStatus}" Classes="muted" TextWrapping="Wrap" />
+          <Button Content="音源ZIPを追加" Click="ImportVoicebank" HorizontalAlignment="Left" />
+          <Expander x:Name="TextSettings" Header="文字・名前の読み方" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="10" Margin="0,10,0,0">
+              <StackPanel Spacing="10" IsEnabled="{Binding TextSettingsReady}">
+                <CheckBox Content="発言者の名前も読む" IsChecked="{Binding ReadAuthorNames}" />
+                <CheckBox Content="話者が変わったときだけ名前を読む" IsEnabled="{Binding ReadAuthorNames}" IsChecked="{Binding NamesOnChange}" />
+                <TextBlock Text="チャット本文の読み上げ文字数" />
+                <TextBox Text="{Binding BodyLimitText}" PlaceholderText="1～180（空欄は既定）" />
+                <CheckBox Content="名前のローマ字をかなに変換" IsChecked="{Binding RomajiNames}" />
+                <CheckBox Content="本文のローマ字をかなに変換" IsChecked="{Binding RomajiBody}" />
+                <TextBlock Text="登録した読み方を優先します。英単語もローマ字として読まれる場合があります。" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+                <CheckBox Content="本文のURLを省略" IsChecked="{Binding OmitUrls}" />
+                <CheckBox IsChecked="{Binding SuppressRepeatedMessages}">
+                  <TextBlock Text="同じ人の同じ発言を5秒間省略" TextWrapping="Wrap" />
+                </CheckBox>
+                <ComboBox ItemsSource="{Binding RecentAuthors}" SelectedItem="{Binding SelectedAuthor}" HorizontalAlignment="Stretch" PlaceholderText="受信した発言者を選ぶ" />
+                <TextBox Text="{Binding SelectedAuthorReading}" PlaceholderText="選んだ発言者の名前の読み方" MaxLength="256" />
+                <WrapPanel>
+                  <Button Content="名前の読み方へ追加" Click="AddAuthorReading" Margin="0,0,8,8" />
+                  <Button Content="読み上げ除外へ追加" Click="AddMutedAuthor" Margin="0,0,0,8" />
+                </WrapPanel>
+                <TextBlock Text="名前の読み方：Twitch:ユーザーID=読み、またはYouTube:チャンネルID=読み（1行1件）" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+                <TextBox Text="{Binding NameRulesText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxLength="65536" />
+                <TextBlock Text="本文の置換：置換前=読み（1行1件）。読みが空なら省略。長い一致を優先します。" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+                <TextBox Text="{Binding ReplacementRulesText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="76" MaxLength="65536" />
+                <TextBlock Text="読み上げ除外：Twitch:ユーザーID、またはYouTube:チャンネルID（1行1件）。行を消すと解除できます。" TextWrapping="Wrap" Classes="muted" FontSize="12" />
+                <TextBox Text="{Binding MutedRulesText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxLength="65536" />
+                <Button Content="保存して適用" Click="ApplyTextSettings" HorizontalAlignment="Left" />
+              </StackPanel>
+              <TextBlock Text="{Binding TextSettingsStatus}" TextWrapping="Wrap" Classes="muted" />
+            </StackPanel>
+          </Expander>
+        </StackPanel>
+      </Border>
+      <Border Classes="card">
+        <StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto"><TextBlock Text="アクティビティ" Classes="heading" /><Button Grid.Column="1" Content="診断をコピー" Click="CopyDiagnostics" /></Grid>
+          <TextBlock Text="{Binding DiagnosticCopyStatus}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+          <ItemsControl ItemsSource="{Binding Activities}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12" Margin="0,4" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </StackPanel>
+      </Border>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
+

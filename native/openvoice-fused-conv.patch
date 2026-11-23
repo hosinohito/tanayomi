@@ -1,0 +1,271 @@
+diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
+--- a/cmake/CMakeLists.txt
++++ b/cmake/CMakeLists.txt
+@@ -151,6 +151,13 @@
+ # Options related to reducing the binary size produced by the build
+ # XNNPACK EP requires the internal NHWC contrib ops to be available, so this option must be OFF when onnxruntime_USE_XNNPACK is ON
+ cmake_dependent_option(onnxruntime_DISABLE_CONTRIB_OPS "Disable contrib ops" OFF "NOT onnxruntime_USE_XNNPACK" OFF)
++# Tanayomi fixed CPU audit candidate. Do not enable the rest of contrib.
++option(onnxruntime_TANAYOMI_FUSED_CONV "Enable only float CPU FusedConv for Tanayomi audit" OFF)
++if(onnxruntime_TANAYOMI_FUSED_CONV)
++  if(NOT onnxruntime_DISABLE_CONTRIB_OPS OR onnxruntime_MINIMAL_BUILD OR onnxruntime_REDUCED_OPS_BUILD)
++    message(FATAL_ERROR "Tanayomi FusedConv requires contrib disabled and a full, non-reduced build")
++  endif()
++endif()
+ option(onnxruntime_DISABLE_ML_OPS "Disable traditional ML ops" OFF)
+ option(onnxruntime_DISABLE_SPARSE_TENSORS "Disable sparse tensors data types" OFF)
+ option(onnxruntime_DISABLE_OPTIONAL_TYPE "Disable optional type" OFF)
+@@ -1011,6 +1018,9 @@
+     target_compile_definitions(${target_name} PRIVATE EIGEN_USE_THREADS)
+     if (onnxruntime_DISABLE_CONTRIB_OPS)
+       target_compile_definitions(${target_name} PRIVATE DISABLE_CONTRIB_OPS)
++    endif()
++    if (onnxruntime_TANAYOMI_FUSED_CONV)
++      target_compile_definitions(${target_name} PRIVATE TANAYOMI_FUSED_CONV)
+     endif()
+ 
+     if (onnxruntime_DISABLE_ML_OPS)
+diff --git a/cmake/onnxruntime_providers_cpu.cmake b/cmake/onnxruntime_providers_cpu.cmake
+--- a/cmake/onnxruntime_providers_cpu.cmake
++++ b/cmake/onnxruntime_providers_cpu.cmake
+@@ -46,6 +46,14 @@
+ source_group(TREE ${ONNXRUNTIME_ROOT}/core FILES ${onnxruntime_providers_common_srcs} ${onnxruntime_providers_srcs})
+ 
+ set(onnxruntime_providers_src ${onnxruntime_providers_common_srcs} ${onnxruntime_providers_srcs})
++
++# Tanayomi: compile only the upstream float FusedConv and activation helper.
++if(onnxruntime_TANAYOMI_FUSED_CONV)
++  list(APPEND onnxruntime_providers_src
++    "${ONNXRUNTIME_ROOT}/contrib_ops/cpu/fused_conv.cc"
++    "${ONNXRUNTIME_ROOT}/contrib_ops/cpu/fused_activation.cc"
++  )
++endif()
+ 
+ # disable contrib ops conditionally
+ if(NOT onnxruntime_DISABLE_CONTRIB_OPS)
+diff --git a/cmake/onnxruntime_graph.cmake b/cmake/onnxruntime_graph.cmake
+--- a/cmake/onnxruntime_graph.cmake
++++ b/cmake/onnxruntime_graph.cmake
+@@ -88,6 +88,10 @@
+ 
+ file(GLOB onnxruntime_graph_src_exclude ${onnxruntime_graph_src_exclude_patterns})
+ list(REMOVE_ITEM onnxruntime_graph_src ${onnxruntime_graph_src_exclude})
++if(onnxruntime_TANAYOMI_FUSED_CONV)
++  list(APPEND onnxruntime_graph_src
++    "${ONNXRUNTIME_ROOT}/core/graph/contrib_ops/tanayomi_fused_conv_schema.cc")
++endif()
+ 
+ if (onnxruntime_ENABLE_TRAINING_OPS)
+   file(GLOB orttraining_graph_src_exclude ${orttraining_graph_src_exclude_patterns})
+diff --git a/onnxruntime/core/session/environment.cc b/onnxruntime/core/session/environment.cc
+--- a/onnxruntime/core/session/environment.cc
++++ b/onnxruntime/core/session/environment.cc
+@@ -38,6 +38,10 @@
+ #endif
+ #ifdef USE_DML
+ #include "core/graph/dml_ops/dml_defs.h"
++#endif
++
++#if defined(TANAYOMI_FUSED_CONV)
++namespace onnxruntime { namespace contrib { void RegisterTanayomiFusedConvSchema(); } }
+ #endif
+ 
+ #include "core/platform/env.h"
+@@ -284,6 +288,9 @@
+       RegisterOpSetSchema<internal_nhwc_onnx::OpSet_Internal_NHWC_ONNX>();
+       contrib::RegisterContribSchemas();
+ #endif
++#if defined(TANAYOMI_FUSED_CONV)
++      contrib::RegisterTanayomiFusedConvSchema();
++#endif
+ 
+ #ifdef USE_DML
+       dml::RegisterDmlSchemas();
+diff --git a/onnxruntime/core/providers/cpu/cpu_execution_provider.cc b/onnxruntime/core/providers/cpu/cpu_execution_provider.cc
+--- a/onnxruntime/core/providers/cpu/cpu_execution_provider.cc
++++ b/onnxruntime/core/providers/cpu/cpu_execution_provider.cc
+@@ -16,6 +16,10 @@
+ 
+ #if defined(ENABLE_TRAINING_OPS)
+ #include "orttraining/training_ops/cpu/cpu_training_kernels.h"
++#endif
++
++#if defined(TANAYOMI_FUSED_CONV)
++namespace onnxruntime { namespace contrib { Status RegisterTanayomiFusedConvKernel(KernelRegistry&); } }
+ #endif
+ 
+ #include "core/framework/compute_capability.h"
+@@ -3671,6 +3675,9 @@
+ #ifndef DISABLE_CONTRIB_OPS
+   ORT_RETURN_IF_ERROR(::onnxruntime::contrib::RegisterCpuContribKernels(kernel_registry));
+ #endif
++#if defined(TANAYOMI_FUSED_CONV)
++  ORT_RETURN_IF_ERROR(::onnxruntime::contrib::RegisterTanayomiFusedConvKernel(kernel_registry));
++#endif
+ #if defined(ENABLE_TRAINING_OPS)
+   ORT_RETURN_IF_ERROR(::onnxruntime::contrib::RegisterCpuTrainingKernels(kernel_registry));
+ #endif
+diff --git a/onnxruntime/contrib_ops/cpu/fused_conv.cc b/onnxruntime/contrib_ops/cpu/fused_conv.cc
+--- a/onnxruntime/contrib_ops/cpu/fused_conv.cc
++++ b/onnxruntime/contrib_ops/cpu/fused_conv.cc
+@@ -3,6 +3,9 @@
+ 
+ #include "core/providers/cpu/nn/conv.h"
+ #include "contrib_ops/cpu/fused_activation.h"
++#if defined(TANAYOMI_FUSED_CONV)
++#include "core/framework/kernel_registry.h"
++#endif
+ 
+ namespace onnxruntime {
+ namespace contrib {
+@@ -22,5 +25,12 @@
+         .TypeConstraint("T", DataTypeImpl::GetTensorType<float>()),
+     FusedConvFloat);
+ 
++#if defined(TANAYOMI_FUSED_CONV)
++Status RegisterTanayomiFusedConvKernel(KernelRegistry& registry) {
++  return registry.Register(BuildKernelCreateInfo<
++      ONNX_OPERATOR_TYPED_KERNEL_CLASS_NAME(kCpuExecutionProvider, kMSDomain, 1, float, FusedConv)>());
++}
++#endif
++
+ }  // namespace contrib
+ }  // namespace onnxruntime
+diff --git a/onnxruntime/core/optimizer/graph_transformer_utils.cc b/onnxruntime/core/optimizer/graph_transformer_utils.cc
+--- a/onnxruntime/core/optimizer/graph_transformer_utils.cc
++++ b/onnxruntime/core/optimizer/graph_transformer_utils.cc
+@@ -414,6 +414,11 @@
+       transformers.emplace_back(std::make_unique<MatMulNBitsFusion>(cpu_ep));
+ 
+ #endif  // !defined(DISABLE_CONTRIB_OPS)
++#if defined(TANAYOMI_FUSED_CONV)
++      // Only this CPU fusion is enabled in the fixed contrib-disabled build.
++      transformers.emplace_back(std::make_unique<ConvActivationFusion>(
++          InlinedHashSet<std::string_view>{onnxruntime::kCpuExecutionProvider}));
++#endif
+       // The QDQFinalCleanupTransformer must run AFTER other transformers that fuse Q/DQ nodes. Otherwise, their
+       // fusions might be prevented if this one removes a Q/DQ node too early.
+       transformers.emplace_back(std::make_unique<QDQFinalCleanupTransformer>(enable_quant_qdq_cleanup));
+diff --git a/onnxruntime/core/optimizer/conv_activation_fusion.cc b/onnxruntime/core/optimizer/conv_activation_fusion.cc
+--- a/onnxruntime/core/optimizer/conv_activation_fusion.cc
++++ b/onnxruntime/core/optimizer/conv_activation_fusion.cc
+@@ -73,6 +73,14 @@
+ 
+   std::optional<NodesToOptimizeIndices> Select(const GraphViewer& graph_viewer, const Node& node) const override {
+     const std::string_view node_ep = node.GetExecutionProviderType();
++#if defined(TANAYOMI_FUSED_CONV)
++    // This audit build registers only the ONNX NCHW float CPU FusedConv kernel.
++    if (node.Domain() != kOnnxDomain || node.OpType() != "Conv" ||
++        node_ep != kCpuExecutionProvider ||
++        !HasElementDataType(*node.InputDefs()[0], ONNX_NAMESPACE::TensorProto_DataType_FLOAT)) {
++      return std::nullopt;
++    }
++#endif
+     const auto* next_node = GetLoneConsumerNode(graph_viewer, node);
+     if (!next_node ||
+         next_node->GetExecutionProviderType() != node_ep) {
+diff --git a/onnxruntime/core/graph/contrib_ops/tanayomi_fused_conv_schema.cc b/onnxruntime/core/graph/contrib_ops/tanayomi_fused_conv_schema.cc
+new file mode 100644
+--- /dev/null
++++ b/onnxruntime/core/graph/contrib_ops/tanayomi_fused_conv_schema.cc
+@@ -0,0 +1,100 @@
++// Copyright (c) Microsoft Corporation. All rights reserved.
++// Licensed under the MIT License.
++// Tanayomi audit: the fixed upstream FusedConv schema only; no other contrib schema.
++#if defined(TANAYOMI_FUSED_CONV)
++#include "core/graph/onnx_protobuf.h"
++#include "core/graph/constants.h"
++#include "onnx/defs/schema.h"
++#include "onnx/defs/shape_inference.h"
++
++// Same declaration as upstream contrib_defs.cc; its implementation is already
++// linked from ONNX's ordinary Conv schema in defs/nn/defs.cc.
++namespace ONNX_NAMESPACE {
++void convPoolShapeInference(InferenceContext& ctx, bool use_dilation,
++                            bool require_kernel_shape, int input1Idx, int input2Idx);
++}
++
++namespace onnxruntime { namespace contrib {
++using namespace ONNX_NAMESPACE;
++void RegisterTanayomiFusedConvSchema() {
++  auto schema = OpSchema("FusedConv", __FILE__, __LINE__)
++                                .SetDomain(kMSDomain).SinceVersion(1)
++                                .SetDoc(R"DOC(
++The fused convolution operator schema is the same as Conv besides it includes an attribute
++activation.)DOC")
++                                .Attr(
++                                    "auto_pad",
++                                    "",
++                                    AttributeProto::STRING,
++                                    std::string("NOTSET"))
++                                .Attr(
++                                    "kernel_shape",
++                                    "",
++                                    AttributeProto::INTS,
++                                    OPTIONAL_VALUE)
++                                .Attr(
++                                    "dilations",
++                                    "",
++                                    AttributeProto::INTS,
++                                    OPTIONAL_VALUE)
++                                .Attr(
++                                    "strides",
++                                    "",
++                                    AttributeProto::INTS,
++                                    OPTIONAL_VALUE)
++                                .Attr(
++                                    "pads",
++                                    "",
++                                    AttributeProto::INTS,
++                                    OPTIONAL_VALUE)
++                                .Attr(
++                                    "group",
++                                    "",
++                                    AttributeProto::INT,
++                                    static_cast<int64_t>(1))
++                                .Attr(
++                                    "activation",
++                                    "",
++                                    AttributeProto::STRING,
++                                    OPTIONAL_VALUE)
++                                .Attr(
++                                    "activation_params",
++                                    "",
++                                    AttributeProto::FLOATS,
++                                    OPTIONAL_VALUE)
++                                .Input(
++                                    0,
++                                    "X",
++                                    "",
++                                    "T")
++                                .Input(
++                                    1,
++                                    "W",
++                                    "",
++                                    "T")
++                                .Input(
++                                    2,
++                                    "B",
++                                    "",
++                                    "T",
++                                    OpSchema::Optional)
++                                .Input(
++                                    3,
++                                    "Z",
++                                    "",
++                                    "T",
++                                    OpSchema::Optional)
++                                .Output(
++                                    0,
++                                    "Y",
++                                    "",
++                                    "T")
++                                .TypeConstraint("T", {"tensor(float16)", "tensor(float)", "tensor(double)"}, "Constrain input and output types to float tensors")
++                                .TypeAndShapeInferenceFunction([](ONNX_NAMESPACE::InferenceContext& ctx) {
++                                  ONNX_NAMESPACE::propagateElemTypeFromInputToOutput(ctx, 0, 0);
++                                  ONNX_NAMESPACE::convPoolShapeInference(ctx, true, false, 0, 1);
++                                });
++  ONNX_NAMESPACE::RegisterSchema(std::move(schema), 0, true, true);
++}
++} }  // namespace onnxruntime::contrib
++#endif

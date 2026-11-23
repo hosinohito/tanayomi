@@ -1,0 +1,87 @@
+--- a/gn/toolchain/BUILD.gn
++++ b/gn/toolchain/BUILD.gn
+@@ -95,17 +95,9 @@
+ 
+   bin = "$win_vc/Tools/MSVC/$win_toolchain_version/bin/HostX64/$target_cpu"
+ 
+-  if (target_cpu == "x64") {
+-    _target = "amd64"
+-  } else {
+-    _target = "amd64_" + target_cpu
+-  }
+-  if (is_winrt) {
+-    _target += " uwp"
+-  }
+-  _target += " " + win_sdk_version + " -vcvars_ver=" + win_vcvars_version
+-  _vcvarsall = "$win_vc/Auxiliary/Build/vcvarsall.bat"
+-  env_setup = "cmd /c set __VSCMD_ARG_NO_LOGO=1 && set VSCMD_START_DIR=%CD% && \"$_vcvarsall\" $_target && "
++  # Tanayomi isolated build change, 2026-10-26: initialize the verified VS
++  # environment once in the guarded Ninja parent. Do not launch VsDevCmd/reg
++  # for each compile/link. Compiler, assembler and linker arguments are kept.
+ 
+   cl_m32_flag = ""
+ 
+@@ -131,12 +123,17 @@
+     link = "\"$bin/link.exe\""
+   }
+ 
++  _cc_command = cl
++  if (cc_wrapper != "") {
++    _cc_command = "$cc_wrapper $cl"
++  }
++
+   tool("asm") {
+     _ml = "ml"
+     if (target_cpu == "x64") {
+       _ml += "64"
+     }
+-    command = "$env_setup \"$bin/$_ml.exe\" {{asmflags}} /nologo /c /Fo {{output}} {{source}}"
++    command = "\"$bin/$_ml.exe\" {{asmflags}} /nologo /c /Fo {{output}} {{source}}"
+     outputs =
+         [ "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.obj" ]
+     description = "assemble {{source}}"
+@@ -147,7 +144,7 @@
+     pdbname = "{{target_out_dir}}/{{label_name}}_c.pdb"
+ 
+     # Label names may have spaces so pdbname must be quoted.
+-    command = "$env_setup $cc_wrapper $cl /nologo /showIncludes /FC {{defines}} {{include_dirs}} {{cflags}} $cl_m32_flag {{cflags_c}} /c {{source}} /Fo{{output}} /Fd\"$pdbname\""
++    command = "$_cc_command /nologo /showIncludes /FC {{defines}} {{include_dirs}} {{cflags}} $cl_m32_flag {{cflags_c}} /c {{source}} /Fo{{output}} /Fd\"$pdbname\""
+     depsformat = "msvc"
+     outputs =
+         [ "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.obj" ]
+@@ -159,7 +156,7 @@
+     pdbname = "{{target_out_dir}}/{{label_name}}_c.pdb"
+ 
+     # Label names may have spaces so pdbname must be quoted.
+-    command = "$env_setup $cc_wrapper $cl /nologo /showIncludes /FC {{defines}} {{include_dirs}} {{cflags}} $cl_m32_flag {{cflags_cc}} /c {{source}} /Fo{{output}} /Fd\"$pdbname\""
++    command = "$_cc_command /nologo /showIncludes /FC {{defines}} {{include_dirs}} {{cflags}} $cl_m32_flag {{cflags_cc}} /c {{source}} /Fo{{output}} /Fd\"$pdbname\""
+     depsformat = "msvc"
+     outputs =
+         [ "{{source_out_dir}}/{{target_output_name}}.{{source_name_part}}.obj" ]
+@@ -169,7 +166,7 @@
+   tool("alink") {
+     rspfile = "{{output}}.rsp"
+ 
+-    command = "$env_setup $lib /nologo /ignore:4221 {{arflags}} /OUT:{{output}} @$rspfile"
++    command = "$lib /nologo /ignore:4221 {{arflags}} /OUT:{{output}} @$rspfile"
+     outputs = [
+       # Ignore {{output_extension}} and always use .lib, there's no reason to
+       # allow targets to override this extension on Windows.
+@@ -194,7 +191,7 @@
+     pdbname = "${dllname_no_ext}.pdb"
+     rspfile = "${dllname_no_ext}.rsp"
+ 
+-    command = "$env_setup $link /nologo /IMPLIB:$libname /DLL /OUT:$dllname /PDB:$pdbname @$rspfile"
++    command = "$link /nologo /IMPLIB:$libname /DLL /OUT:$dllname /PDB:$pdbname @$rspfile"
+     outputs = [
+       dllname,
+       libname,
+@@ -226,7 +223,7 @@
+     pdbname = "$exename.pdb"
+     rspfile = "$exename.rsp"
+ 
+-    command = "$env_setup $link /nologo /OUT:$exename /PDB:$pdbname @$rspfile"
++    command = "$link /nologo /OUT:$exename /PDB:$pdbname @$rspfile"
+     default_output_extension = ".exe"
+     default_output_dir = "{{root_out_dir}}"
+     outputs = [ exename ]

@@ -1,0 +1,72 @@
+diff --git a/cmake/onnxruntime_common.cmake b/cmake/onnxruntime_common.cmake
+index d927489..6a3a645 100644
+--- a/cmake/onnxruntime_common.cmake
++++ b/cmake/onnxruntime_common.cmake
+@@ -80,8 +80,10 @@ endif()
+ 
+ # platform-specific device discovery files
+ if (WIN32)
++    # Tanayomi CPU-only runtime: use upstream CPU/CPUID discovery so no newer
++    # DXCore GPU/NPU enumeration SDK is required. Upstream commit a83fc4d.
+     list(APPEND onnxruntime_common_src_patterns
+-         "${ONNXRUNTIME_ROOT}/core/platform/windows/device_discovery.cc")
++         "${ONNXRUNTIME_ROOT}/core/platform/device_discovery_default.cc")
+ elseif (LINUX)
+     list(APPEND onnxruntime_common_src_patterns
+          "${ONNXRUNTIME_ROOT}/core/platform/linux/device_discovery.cc")
+diff --git a/onnxruntime/core/optimizer/graph_transformer_utils.cc b/onnxruntime/core/optimizer/graph_transformer_utils.cc
+index dbf86e2..74dffef 100644
+--- a/onnxruntime/core/optimizer/graph_transformer_utils.cc
++++ b/onnxruntime/core/optimizer/graph_transformer_utils.cc
+@@ -202,7 +202,7 @@ InlinedVector<std::unique_ptr<GraphTransformer>> GenerateTransformers(
+     TransformerLevel level,
+     const SessionOptions& session_options,
+     const IExecutionProvider& cpu_execution_provider, /*required by constant folding*/
+-    const logging::Logger& logger,
++    [[maybe_unused]] const logging::Logger& logger,
+     const InlinedHashSet<std::string>& rules_and_transformers_to_disable,
+     [[maybe_unused]] concurrency::ThreadPool* intra_op_thread_pool) {
+   InlinedVector<std::unique_ptr<GraphTransformer>> transformers;
+@@ -472,7 +472,7 @@ InlinedVector<std::unique_ptr<GraphTransformer>> GenerateTransformersForMinimalB
+     const SessionOptions& session_options,
+     const SatApplyContextVariant& apply_context,
+     const IExecutionProvider& cpu_execution_provider,
+-    const logging::Logger& logger,
++    [[maybe_unused]] const logging::Logger& logger,
+     const InlinedHashSet<std::string>& rules_and_transformers_to_disable,
+     [[maybe_unused]] concurrency::ThreadPool* intra_op_thread_pool) {
+   InlinedVector<std::unique_ptr<GraphTransformer>> transformers;
+diff --git a/onnxruntime/core/session/inference_session.cc b/onnxruntime/core/session/inference_session.cc
+index e3291cd..011bbb9 100644
+--- a/onnxruntime/core/session/inference_session.cc
++++ b/onnxruntime/core/session/inference_session.cc
+@@ -1,6 +1,12 @@
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT License.
+ 
++#if defined(_MSC_VER) && _MSC_VER < 1930
++// Tanayomi build compatibility: old MSVC reports unused WinAI-only static
++// helpers at translation-unit end despite their upstream [[maybe_unused]].
++#pragma warning(disable : 4505)
++#endif
++
+ #include "core/graph/onnx_protobuf.h"
+ #include "core/session/inference_session.h"
+ 
+diff --git a/onnxruntime/lora/adapter_format_utils.cc b/onnxruntime/lora/adapter_format_utils.cc
+index ad8c9c1..7b778e8 100644
+--- a/onnxruntime/lora/adapter_format_utils.cc
++++ b/onnxruntime/lora/adapter_format_utils.cc
+@@ -1,6 +1,12 @@
+ // Copyright (c) Microsoft Corporation. All rights reserved.
+ // Licensed under the MIT License.
+ 
++#if defined(_MSC_VER) && _MSC_VER < 1930
++// Tanayomi build compatibility: this compiler reports unused static functions
++// at translation-unit end even when their declaration has [[maybe_unused]].
++#pragma warning(disable : 4505)
++#endif
++
+ #include "adapter_format_utils.h"
+ #include "adapter_format_version.h"
+ 

@@ -1,0 +1,76 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RuntimeResourceCopy Condition="'$(PublishResourcesDirectly)' == 'true'">Never</RuntimeResourceCopy>
+    <RuntimeResourceCopy Condition="'$(RuntimeResourceCopy)' == ''">PreserveNewest</RuntimeResourceCopy>
+  </PropertyGroup>
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64;linux-x64;linux-arm64;osx-x64;osx-arm64</RuntimeIdentifiers>
+    <WorldNativeDirectory Condition="'$(WorldNativeDirectory)' == ''">$(MSBuildThisFileDirectory)../../.local/build/native-world</WorldNativeDirectory>
+    <WorldNativeEnabled Condition="'$(WorldComparison)' != 'true' and ('$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and '$(OS)' == 'Windows_NT')) and Exists('$(WorldNativeDirectory)/tanayomi-world.dll')">true</WorldNativeEnabled>
+    <DefineConstants Condition="'$(WorldNativeEnabled)' == 'true'">$(DefineConstants);WORLD_NATIVE</DefineConstants>
+    <OpenJtalkNativeDirectory Condition="'$(OpenJtalkNativeDirectory)' == ''">$(MSBuildThisFileDirectory)../../.local/build/native-open-jtalk</OpenJtalkNativeDirectory>
+    <TohokuOpenJtalkDirectory>$(MSBuildThisFileDirectory)../../.local/vendor/tohoku-f01/8e3306021db135c265f5eda5f062dc489707ddf8</TohokuOpenJtalkDirectory>
+    <MmdagentVoiceDirectory>$(MSBuildThisFileDirectory)../../.local/vendor/mmdagent/1.8</MmdagentVoiceDirectory>
+    <VoicevoxDirectory>$(MSBuildThisFileDirectory)../../.local/vendor/voicevox/package</VoicevoxDirectory>
+    <SupertonicDirectory>$(MSBuildThisFileDirectory)../../.local/vendor/supertonic/prepared-md-vc143</SupertonicDirectory>
+    <AivisDirectory Condition="'$(AivisDirectory)' == ''">$(MSBuildThisFileDirectory)../../.local/vendor/aivis/package-4a8ce577e6f5417b9d9e90a508e0f8c2</AivisDirectory>
+    <OpenJtalkNativeEnabled Condition="'$(WorldComparison)' != 'true' and ('$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and '$(OS)' == 'Windows_NT')) and Exists('$(OpenJtalkNativeDirectory)/tanayomi-open-jtalk.dll')">true</OpenJtalkNativeEnabled>
+    <DefineConstants Condition="'$(OpenJtalkNativeEnabled)' == 'true'">$(DefineConstants);OPEN_JTALK_NATIVE</DefineConstants>
+    <OpenVoiceNativeDirectory Condition="'$(OpenVoiceNativeDirectory)' == ''">$(MSBuildThisFileDirectory)../../.local/build/native-openvoice</OpenVoiceNativeDirectory>
+    <OpenVoiceNativeEnabled Condition="'$(OpenJtalkNativeEnabled)' == 'true' and Exists('$(OpenVoiceNativeDirectory)/openvoice-build.json')">true</OpenVoiceNativeEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Tanayomi/Tanayomi.csproj" />
+    <PackageReference Include="Avalonia.Desktop" Version="$(AvaloniaVersion)" />
+    <PackageReference Include="Microsoft.ML.OnnxRuntime.Managed" Version="1.23.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../assets/onnx-managed-LICENSE.txt;../../assets/onnx-managed-NOTICES.txt;../../assets/numerics-tensors-LICENSE.txt;../../assets/numerics-tensors-NOTICES.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(WorldComparison)' == 'true'">
+    <None Include="$(WorldNativeDirectory)/tanayomi-world.dll" Link="tanayomi-world.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/world-LICENSE.txt" Link="licenses/world-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/ooura-fft-LICENSE.txt" Link="licenses/ooura-fft-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/world-runtime-LICENSE.txt" Link="licenses/world-runtime-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(WorldNativeEnabled)' == 'true'">
+    <None Include="$(WorldNativeDirectory)/tanayomi-world.dll" Link="tanayomi-world.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/world-LICENSE.txt" Link="licenses/world-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/ooura-fft-LICENSE.txt" Link="licenses/ooura-fft-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/world-runtime-LICENSE.txt" Link="licenses/world-runtime-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OpenJtalkNativeEnabled)' == 'true'">
+    <None Include="$(OpenJtalkNativeDirectory)/tanayomi-open-jtalk.dll;$(OpenJtalkNativeDirectory)/open-jtalk-build.json;$(OpenJtalkNativeDirectory)/nitech_jp_atr503_m001.htsvoice" Link="resources/open-jtalk/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(OpenJtalkNativeDirectory)/dictionary/char.bin;$(OpenJtalkNativeDirectory)/dictionary/matrix.bin;$(OpenJtalkNativeDirectory)/dictionary/sys.dic;$(OpenJtalkNativeDirectory)/dictionary/unk.dic" Link="resources/open-jtalk/dictionary/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/open-jtalk-LICENSE.txt;../../assets/hts-engine-LICENSE.txt;../../assets/open-jtalk-dictionary-LICENSE.txt;../../assets/nit-atr503-LICENSE.txt;../../assets/open-jtalk-runtime-LICENSE.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OpenJtalkNativeEnabled)' == 'true' and Exists('../../assets/tohoku-f01-LICENSE.txt') and Exists('../../assets/tohoku-f01-NOTICE.txt')">
+    <None Include="$(TohokuOpenJtalkDirectory)/tohoku-f01-neutral.htsvoice" Condition="Exists('$(TohokuOpenJtalkDirectory)/tohoku-f01-neutral.htsvoice')" Link="resources/open-jtalk/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(TohokuOpenJtalkDirectory)/tohoku-f01-angry.htsvoice" Condition="Exists('$(TohokuOpenJtalkDirectory)/tohoku-f01-angry.htsvoice')" Link="resources/open-jtalk/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(TohokuOpenJtalkDirectory)/tohoku-f01-happy.htsvoice" Condition="Exists('$(TohokuOpenJtalkDirectory)/tohoku-f01-happy.htsvoice')" Link="resources/open-jtalk/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(TohokuOpenJtalkDirectory)/tohoku-f01-sad.htsvoice" Condition="Exists('$(TohokuOpenJtalkDirectory)/tohoku-f01-sad.htsvoice')" Link="resources/open-jtalk/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/tohoku-f01-LICENSE.txt;../../assets/tohoku-f01-NOTICE.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OpenJtalkNativeEnabled)' == 'true' and Exists('$(MmdagentVoiceDirectory)/mei/COPYRIGHT.txt') and Exists('$(MmdagentVoiceDirectory)/takumi/COPYRIGHT.txt')">
+    <None Include="$(MmdagentVoiceDirectory)/mei/mei_normal.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_angry.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_bashful.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_happy.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_sad.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_normal.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_angry.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_happy.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_sad.htsvoice" Link="resources/open-jtalk/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="../../assets/mmdagent-mei-COPYRIGHT.txt;../../assets/mmdagent-takumi-COPYRIGHT.txt;../../assets/mmdagent-voices-NOTICE.txt" Link="licenses/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OpenVoiceNativeEnabled)' == 'true'">
+    <None Include="$(OpenVoiceNativeDirectory)/reference.onnx;$(OpenVoiceNativeDirectory)/converter.onnx;$(OpenVoiceNativeDirectory)/onnxruntime.dll;$(OpenVoiceNativeDirectory)/msvcp140.dll;$(OpenVoiceNativeDirectory)/vcruntime140.dll;$(OpenVoiceNativeDirectory)/vcruntime140_1.dll;$(OpenVoiceNativeDirectory)/openvoice-build.json;$(OpenVoiceNativeDirectory)/OpenVoice-LICENSE.txt;$(OpenVoiceNativeDirectory)/OpenVoice-NOTICE.txt" Link="resources/openvoice/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(OpenVoiceNativeDirectory)/OpenVoice-LICENSE.txt;$(OpenVoiceNativeDirectory)/OpenVoice-NOTICE.txt;$(OpenVoiceNativeDirectory)/onnxruntime-LICENSE.txt;$(OpenVoiceNativeDirectory)/onnxruntime-NOTICES.txt;$(OpenVoiceNativeDirectory)/eigen-LICENSE.txt;$(OpenVoiceNativeDirectory)/eigen-source.zip;$(OpenVoiceNativeDirectory)/microsoft-vc-runtime-LICENSE.txt" Link="licenses/openvoice/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OpenJtalkNativeEnabled)' == 'true' and Exists('$(VoicevoxDirectory)/voicevox-assets.json')">
+    <None Include="$(VoicevoxDirectory)/**/*" Link="resources/voicevox/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OpenJtalkNativeEnabled)' == 'true' and Exists('$(SupertonicDirectory)/supertonic-assets.json')">
+    <None Include="$(SupertonicDirectory)/*.onnx;$(SupertonicDirectory)/*.dll;$(SupertonicDirectory)/*.bin;$(SupertonicDirectory)/tts.json" Link="resources/supertonic/%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(SupertonicDirectory)/licenses/**/*" Link="resources/supertonic/licenses/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(OpenJtalkNativeEnabled)' == 'true' and Exists('$(AivisDirectory)/voices.json')">
+    <None Include="$(AivisDirectory)/**/*" Exclude="$(AivisDirectory)/archive-audit.json" Link="resources/aivis/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="../../native/SkiaNative.targets" />
+</Project>
+

@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <SkiaNativeDirectory Condition="'$(SkiaNativeDirectory)' == ''">$(MSBuildThisFileDirectory)../.local/build/native-skia</SkiaNativeDirectory>
+    <AuditedSkiaEnabled Condition="('$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and '$(OS)' == 'Windows_NT')) and Exists('$(SkiaNativeDirectory)/skia-build.json')">true</AuditedSkiaEnabled>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(AuditedSkiaEnabled)' == 'true'">
+    <AuditedSkiaFile Include="$(SkiaNativeDirectory)/libSkiaSharp.dll" ExpectedHash="828EF8C611AD23EC33CA1A6581A8CFE8F0CBB45925C0AE87CFC074BAED8C2458" />
+    <AuditedSkiaFile Include="$(SkiaNativeDirectory)/msvcp140.dll" ExpectedHash="43A9666C2F405258F165B53082860AC7838039A75FD2E85286085EDE0DA0273B" />
+    <AuditedSkiaFile Include="$(SkiaNativeDirectory)/vcruntime140.dll" ExpectedHash="C865C3366A98431EC3A5959CB5AC3966081A43B82DFCD8BFEFAFE0146B1508DB" />
+    <AuditedSkiaFile Include="$(SkiaNativeDirectory)/vcruntime140_1.dll" ExpectedHash="6C1E531C25AB2934A4EA9970598BC751D924D7CC5650DF3E1282B61D6CD24F42" />
+    <None Include="$(MSBuildThisFileDirectory)../assets/skia-native-NOTICES.txt" Link="licenses/skia-native-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(MSBuildThisFileDirectory)../assets/microsoft-vc-runtime-LICENSE.txt" Link="licenses/skia-microsoft-vc-runtime-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(SkiaNativeDirectory)/skia-build.json" Link="licenses/skia-build.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="ValidateAuditedSkia" BeforeTargets="CopyFilesToOutputDirectory;Publish" Condition="'$(AuditedSkiaEnabled)' == 'true'">
+    <GetFileHash Files="@(AuditedSkiaFile)" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="VerifiedSkiaFile" />
+    </GetFileHash>
+    <Error Condition="'%(VerifiedSkiaFile.FileHash)' != '%(VerifiedSkiaFile.ExpectedHash)'" Text="Audited Skia/CRT input hash mismatch: %(VerifiedSkiaFile.Filename)%(VerifiedSkiaFile.Extension)" />
+  </Target>
+  <Target Name="CopyAuditedSkiaBuild" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="ValidateAuditedSkia" Condition="'$(AuditedSkiaEnabled)' == 'true'">
+    <Copy SourceFiles="@(AuditedSkiaFile)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(AuditedSkiaFile)" DestinationFolder="$(TargetDir)runtimes/win-x64/native/" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="CopyAuditedSkiaPublish" AfterTargets="Publish" DependsOnTargets="ValidateAuditedSkia" Condition="'$(AuditedSkiaEnabled)' == 'true'">
+    <Copy SourceFiles="@(AuditedSkiaFile)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

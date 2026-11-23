@@ -1,0 +1,44 @@
+[
+  {
+    "name": "jinja2",
+    "version": "3.1.6",
+    "file": "jinja2-3.1.6-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/62/a1/3d680cbfd5f4b8f15abc1d571870c5fc3e594bb582bc3b64ea099db13e56/jinja2-3.1.6-py3-none-any.whl",
+    "sha256": "85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67"
+  },
+  {
+    "name": "llvmlite",
+    "version": "0.46.0",
+    "file": "llvmlite-0.46.0-cp311-cp311-win_amd64.whl",
+    "url": "https://files.pythonhosted.org/packages/19/0c/8f5a37a65fc9b7b17408508145edd5f86263ad69c19d3574e818f533a0eb/llvmlite-0.46.0-cp311-cp311-win_amd64.whl",
+    "sha256": "e8b10bc585c58bdffec9e0c309bb7d51be1f2f15e169a4b4d42f2389e431eb93"
+  },
+  {
+    "name": "markupsafe",
+    "version": "3.0.3",
+    "file": "markupsafe-3.0.3-cp311-cp311-win_amd64.whl",
+    "url": "https://files.pythonhosted.org/packages/83/8a/4414c03d3f891739326e1783338e48fb49781cc915b2e0ee052aa490d586/markupsafe-3.0.3-cp311-cp311-win_amd64.whl",
+    "sha256": "de8a88e63464af587c950061a5e6a67d3632e36df62b986892331d4620a35c01"
+  },
+  {
+    "name": "networkx",
+    "version": "3.6.1",
+    "file": "networkx-3.6.1-py3-none-any.whl",
+    "url": "https://files.pythonhosted.org/packages/9e/c9/b2622292ea83fbb4ec318f5b9ab867d0a28ab43c5717bb85b0a5f6b3b0a4/networkx-3.6.1-py3-none-any.whl",
+    "sha256": "d47fbf302e7d9cbbb9e2555a0d267983d2aa476bac30e90dfbe5669bd57f3762"
+  },
+  {
+    "name": "numba",
+    "version": "0.64.0",
+    "file": "numba-0.64.0-cp311-cp311-win_amd64.whl",
+    "url": "https://files.pythonhosted.org/packages/31/29/e09d5630578a50a2b3fa154990b6b839cf95327aa0709e2d50d0b6816cd1/numba-0.64.0-cp311-cp311-win_amd64.whl",
+    "sha256": "f2b1fd93e7aaac07d6fbaed059c00679f591f2423885c206d8c1b55d65ca3f2d"
+  },
+  {
+    "name": "torch",
+    "version": "2.9.1+cpu",
+    "file": "torch-2.9.1+cpu-cp311-cp311-win_amd64.whl",
+    "url": "https://download-r2.pytorch.org/whl/cpu/torch-2.9.1%2Bcpu-cp311-cp311-win_amd64.whl",
+    "sha256": "69b3785d28be5a9c56ab525788ec5000349ec59132a74b7d5e954b905015b992"
+  }
+]

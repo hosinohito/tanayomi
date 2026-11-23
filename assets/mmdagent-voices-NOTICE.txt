@@ -1,0 +1,23 @@
+MMDAgent Example 1.8: HTS Voice "Mei" 1.5 and HTS Voice "Takumi" 1.0
+
+Mei: Copyright (c) 2009-2018 Nagoya Institute of Technology, Department of Computer Science.
+Takumi: Copyright (c) 2017-2018 Nagoya Institute of Technology, Department of Computer Science.
+Released by the MMDAgent Project Team. No endorsement is implied.
+
+License: Creative Commons Attribution 3.0 Unported
+https://creativecommons.org/licenses/by/3.0/legalcode
+Original copyright notices are in mmdagent-mei-COPYRIGHT.txt and mmdagent-takumi-COPYRIGHT.txt.
+
+The nine HTS models are unmodified. No 3-D models, images or other character materials are included.
+Source: https://sourceforge.net/projects/mmdagent/files/MMDAgent_Example/MMDAgent_Example-1.8/
+Archive SHA-256: f702f2109a07dca103c7b9a5123a25c6dda038f0d7fcc899ff0281d07e873a63
+
+The MMDAgent team's voice terms also cover generated waveforms and require attribution.
+The team's supplementary notice states that modified/remixed works must be distributed under the same terms.
+https://mmdagent.wordpress.com/2013/12/13/license-terms-of-for-the-all-files-other-than-the-3-d-model-mei/
+
+生成音声の公開・収益化配信では、使用した音声に応じ、配信概要等に次の帰属と許諾を表示してください。
+Mei: HTS Voice "Mei" (c) 2009-2018 Nagoya Institute of Technology / MMDAgent Project Team, CC BY 3.0
+Takumi: HTS Voice "Takumi" (c) 2017-2018 Nagoya Institute of Technology / MMDAgent Project Team, CC BY 3.0
+https://creativecommons.org/licenses/by/3.0/
+公式の関与・推奨を示す表示は行わないでください。加工・改変した場合はその旨を示し、同じ許諾条件で配布してください。

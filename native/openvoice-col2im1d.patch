@@ -1,0 +1,28 @@
+diff --git a/onnxruntime/core/util/math_cpu.cc b/onnxruntime/core/util/math_cpu.cc
+--- a/onnxruntime/core/util/math_cpu.cc
++++ b/onnxruntime/core/util/math_cpu.cc
+@@ -903,3 +903,24 @@
+   Set<float, CPUMathUtil>(narrow<ptrdiff_t>(img_size), 0, data_img, context);
++  // Keep the generic path for other ranks and unusual/unchecked geometry.
++  // The bounds below also keep the clipped-index arithmetic within int64_t.
++  if (N == 1 && dilation[0] == 1 && img_shape[0] > 0 &&
++      img_shape[0] <= INT64_MAX / 2 && kernel_shape[0] > 0 &&
++      kernel_shape[0] <= img_shape[0] && pad[0] >= 0 &&
++      pad[0] <= img_shape[0] && stride[0] > 0 && output_shape[0] > 0) {
++    const int64_t width = img_shape[0];
++    const int64_t length = output_shape[0];
++    const int64_t kernel = kernel_shape[0];
++    const int64_t step = stride[0];
++    for (int64_t c = 0; c < channels_col; ++c) {
++      const int64_t offset = c % kernel - pad[0];
++      const int64_t begin = offset < 0 ? (-(offset + 1)) / step + 1 : 0;
++      const int64_t end = offset >= width ? 0 : std::min(length, (width - 1 - offset) / step + 1);
++      // Preserve the original channel/kernel/input accumulation order.
++      for (int64_t x = begin; x < end; ++x) {
++        data_img[(c / kernel) * width + offset + x * step] += data_col[c * length + x];
++      }
++    }
++    return;
++  }
+   Im2col<float, StorageOrder::NCHW>()(
+       data_col,

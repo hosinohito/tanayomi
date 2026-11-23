@@ -1,0 +1,82 @@
+--- a/onnxruntime/core/mlas/lib/convolve.cpp
++++ b/onnxruntime/core/mlas/lib/convolve.cpp
+@@ -38,9 +38,28 @@
+     struct SEGMENT {
+         size_t StartN;
+         size_t CountN;
++        size_t StartM;
++        size_t CountM;
+     } Segments[MLAS_MAXIMUM_THREAD_COUNT];
+     ptrdiff_t TargetThreadCount;
+ };
++
++// Restricted experiment: preserve the existing 16-column GEMM partition.
++static bool
++MlasConvRowSplitShape(const MLAS_CONV_PARAMETERS* Parameters)
++{
++    return Parameters->Dimensions == 2 &&
++        Parameters->BatchCount == 1 && Parameters->GroupCount == 1 &&
++        Parameters->FilterCount == 384 && Parameters->InputChannels == 192 &&
++        Parameters->K == 960 && Parameters->OutputSize == 32 &&
++        Parameters->InputShape[0] == 1 && Parameters->InputShape[1] == 32 &&
++        Parameters->OutputShape[0] == 1 && Parameters->OutputShape[1] == 32 &&
++        Parameters->KernelShape[0] == 1 && Parameters->KernelShape[1] == 5 &&
++        Parameters->StrideShape[0] == 1 && Parameters->StrideShape[1] == 1 &&
++        Parameters->DilationShape[0] == 1 && Parameters->DilationShape[1] == 1 &&
++        Parameters->Padding[0] == 0 && Parameters->Padding[1] == 2 &&
++        Parameters->Padding[2] == 0 && Parameters->Padding[3] == 2;
++}
+ 
+ void
+ MlasConvIm2Col(
+@@ -637,9 +656,13 @@
+     float* ColumnBuffer =
+         WorkBlock->WorkingBuffer + Index * MLAS_CONV_WORKING_BUFFER_SIZE_PER_THREAD;
+ 
+-    MlasConvOperation(WorkBlock->Parameters, WorkBlock->Input, WorkBlock->Filter,
+-        WorkBlock->Bias, ColumnBuffer, WorkBlock->Output, Segment->StartN,
+-        Segment->CountN);
++    MLAS_CONV_PARAMETERS LocalParameters = *WorkBlock->Parameters;
++    LocalParameters.FilterCount = Segment->CountM;
++    MlasConvOperation(&LocalParameters, WorkBlock->Input,
++        WorkBlock->Filter + Segment->StartM * LocalParameters.K,
++        WorkBlock->Bias == nullptr ? nullptr : WorkBlock->Bias + Segment->StartM,
++        ColumnBuffer, WorkBlock->Output + Segment->StartM * LocalParameters.OutputSize,
++        Segment->StartN, Segment->CountN);
+ }
+ 
+ void
+@@ -886,10 +909,20 @@
+ 
+         WorkBlock.Segments[Index].StartN = SegmentStartN;
+         WorkBlock.Segments[Index].CountN = SegmentCountN;
+-
++        WorkBlock.Segments[Index].StartM = 0;
++        WorkBlock.Segments[Index].CountM = Parameters->FilterCount;
+         Index++;
+     }
+ 
++    if (MlasConvRowSplitShape(Parameters) && Parameters->ThreadCount == 4 &&
++        ThreadStrideN == 16 && Index == 2) {
++        for (int32_t i = 0; i < 2; i++) {
++            WorkBlock.Segments[i].CountM = 192;
++            WorkBlock.Segments[i + 2] = WorkBlock.Segments[i];
++            WorkBlock.Segments[i + 2].StartM = 192;
++        }
++        Index = 4;
++    }
+     MlasExecuteThreaded(MlasConvOperationThreaded, &WorkBlock, Index, ThreadPool);
+ 
+     return true;
+@@ -1402,6 +1435,11 @@
+             }
+         }
+ 
++        if (MaximumThreadCount == 4 && StrideN == 16 &&
++            MlasConvRowSplitShape(Parameters)) {
++            // Four disjoint M/N jobs each own a full scratch region.
++            TargetThreadCount = 4;
++        }
+         Parameters->ThreadCount = TargetThreadCount;
+ 
+         Parameters->Algorithm = MlasConvAlgorithmExpandThenGemmSegmented;
