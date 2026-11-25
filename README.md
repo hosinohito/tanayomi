@@ -2,6 +2,20 @@
 
 Twitch／YouTubeのチャットを日本語のOS標準音声、UTAU音源、同梱の日本語音声で読み上げるアプリ。Windows・macOS・Linux・Android・iOSを対象とする。
 
+## Windows版の音声機能
+
+| 方式 | 実装・構成の入口 |
+| --- | --- |
+| VOICEVOX（アプリ内蔵） | [音声一覧](src/Tanayomi.Desktop/VoicevoxCatalog.cs)、[合成ワーカー](src/Tanayomi.Desktop/VoicevoxPcmWorker.cs)、[資産準備](native/prepare-voicevox.ps1) |
+| Supertonic 3 | [音声出力](src/Tanayomi.Desktop/SupertonicSpeech.cs)、[資産準備](native/prepare-supertonic.ps1) |
+| Aivis系の同梱音声 | [音声出力](src/Tanayomi.Desktop/AivisSpeech.cs)、[資産準備](native/aivis/package.py) |
+| NIT日本語・東北大f01・Mei・Takumi | [Open JTalkワーカー](src/Tanayomi.Desktop/OpenJtalkPcmWorker.cs) |
+| UTAU・NIT日本語＋OpenVoice | [UTAU合成](src/Tanayomi/UtauSpeech.cs)、[OpenVoice変換](src/Tanayomi.Desktop/Neural/DesktopNeuralUtau.cs) |
+
+音声を発言ごとに選ぶランダム設定、0〜400%の音量調整、OpenVoice専用の「間延びモード」に対応する。操作と保存仕様は[SPEC.md](SPEC.md)を参照する。
+
+**GitHubのソースZIPと、音声資産を準備済みのWindowsアプリ一式は内容が異なる。** Git管理対象はソース・試験・文書・許諾付きの同梱原本で、追加取得するエンジンDLL・モデルや生成物を置く`.local/`は含めない。クローンしただけで`publish`しても、準備していない方式は含まれず、起動時の音声選択肢にも表示されない。各資産の準備手順は[Open JTalkの固定入力](#open-jtalkの固定入力)以降、許諾条件は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照する。実行物の参照先は[CURRENT_TASK.md](CURRENT_TASK.md)に記載する。
+
 ## 起動と利用操作
 
 Windows版はアプリ一式の`Tanayomi.Desktop.exe`を直接起動する。利用時に.NET SDKや起動用コマンドは不要。接続、音源選択、保存データの扱いは[SPEC.md](SPEC.md)を参照する。開発中の最新の起動パスは[CURRENT_TASK.md](CURRENT_TASK.md)に記載する。
@@ -20,7 +34,7 @@ UTAUは同梱のNAIST-JDIC派生辞書とC#の読み変換、日本語原音の�
 | `src/Tanayomi.Android/`・`src/Tanayomi.iOS/` | 各OSの起動部・バックグラウンド動作・標準音声・PCM出力 |
 | `tests/Tanayomi.Tests/` | 正常系・異常系の試験と画面描画 |
 | `assets/` | 同梱音源、派生辞書、変換スクリプト、許諾文 |
-| `native/` | WORLD比較用C ABIブリッジと固定版ビルドスクリプト |
+| `native/` | WORLD・Open JTalk・OpenVoiceのブリッジ／ビルドと、VOICEVOX・Supertonic・Aivis等の資産準備 |
 | `.local/` | 開発環境、キャッシュ、一時生成物 |
 | `.local/build/` | ビルド・中間・publish出力 |
 | `.local/tryout/<日時>-<短ID>/` | 新規作成する各自己完結型コピーと、それぞれの`data/` |
@@ -28,6 +42,66 @@ UTAUは同梱のNAIST-JDIC派生辞書とC#の読み変換、日本語原音の�
 標準音声はWindowsのSAPI、macOSの`say`、LinuxのSpeech Dispatcher（独自SSIPクライアント）、AndroidのTextToSpeech、iOSのAVSpeechSynthesizerを使う。PCM再生はWindowsのWinMM、macOSのAudioQueue、Linuxの`aplay`、AndroidのAudioTrack、iOSのAVAudioPlayerへ渡す。LinuxのSpeech DispatcherはOS側で起動しておく。認証保存はWindowsのDPAPI、macOSのKeychain、LinuxのSecret Serviceを使い、Linuxでは`/usr/bin/secret-tool`が必要。これらのOSサービス・コマンドは同梱しない。
 
 ## 開発手順
+
+### 初回のWindows開発環境
+
+以下は開発者向け。完成したアプリを使うだけなら不要。Windows x64の通常ユーザーで作業し、コマンドの作業場所はクローンしたリポジトリの直下とする。
+
+1. Git for Windowsと、**x64のPowerShell 7.4以降**を用意する。Windows標準の`powershell.exe`（5.1）では開発スクリプトを実行できない。PowerShellの導入は[Microsoft公式手順](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)に従う。ZIP版なら任意の開発用ディレクトリーへ展開できる。`pwsh`が見つからない場合は、展開先の`pwsh.exe`を絶対パスで起動する。CodexやGitHub CLIは必要ない。
+2. 空の作業先へソースを取得する。既存の作業フォルダーへ重ねてcloneしない。
+
+   ```powershell
+   git clone https://github.com/hosinohito/tanayomi.git C:/work/tanayomi
+   Set-Location C:/work/tanayomi
+   $PSVersionTable.PSVersion
+   ```
+
+3. [global.json](global.json)のSDK（現在.NET **10.0.402**、`latestPatch`）を用意する。Runtimeだけではビルドできない。[公式.NET 10ダウンロード](https://dotnet.microsoft.com/download/dotnet/10.0)の該当SDKのWindows x64バイナリーZIPを検証して、`dotnet.exe`が直下に来るよう`.local/dotnet/`へ展開する。既に互換SDKを導入済みならPATH上の`dotnet`も利用できるが、`dev.ps1`は`.local/dotnet/`を優先する。
+4. 同じPowerShellで保存先を設定してSDKを確認する。これらは現在のシェルと子プロセスだけに適用される。通常の開発操作では`dev.ps1`が同じ設定を行う。
+
+   ```powershell
+   $env:TEMP = Join-Path $PWD '.local/tmp'
+   $env:TMP = $env:TEMP
+   $env:TMPDIR = $env:TEMP
+   $env:DOTNET_CLI_HOME = Join-Path $PWD '.local/cli'
+   $env:NUGET_PACKAGES = Join-Path $PWD '.local/nuget'
+   $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
+   New-Item -ItemType Directory -Force $env:TEMP | Out-Null
+   & ./.local/dotnet/dotnet.exe --version
+   ```
+
+   システムSDKを使う場合だけ最後を`dotnet --version`へ替える。リポジトリ直下で実行し、SDK不一致を`global.json`の書換えで回避しない。
+5. 下の`build`→`test`→`run`を実行する。初回はNuGetへの通信が必要。`dev.ps1`が`--locked-mode`で復元するため、個別の`dotnet restore`やパッケージ更新は不要。失敗した場合は終了コードと表示された不足条件を確認する。
+
+この段階ではOS標準音声と同梱UTAU原本を使う基本構成になる。追加音声・監査済みネイティブ資産は次節で準備する。通常のC#編集だけならVisual Studio、C++コンパイラー、Pythonは不要。
+
+### 全音声入り構成を準備する順序
+
+追加資産はGit clone／NuGet復元で取得されない。以下の順に、必要な方式の固定入力を準備してから`publish`する。取得元・版・SHA・許諾は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)、詳細操作は本書の対応節を正本とする。ダウンロード・ビルドの中間物と完成コピーを複数保持するため、完成アプリの容量だけで空き容量を見積もらない。
+
+| 順序・対象 | 準備入口と必要条件 | 通常ビルドが読む場所 |
+| --- | --- | --- |
+| 1. WORLD／LLVM | [WORLDビルド](#world比較用のネイティブビルド)の`build-world-llvm.ps1 -DownloadToolchain`で固定LLVMを取得。監査・試験後のDLLを配置 | `.local/build/native-world/` |
+| 2. Open JTalk／NIT | [固定入力](#open-jtalkの固定入力)の公式4アーカイブを取得し、上記LLVMで`build-open-jtalk.ps1`を実行。監査出力のDLL・辞書・モデル・manifestを同節の手順で配置 | `.local/build/native-open-jtalk/` |
+| 3. VOICEVOX | `./native/prepare-voicevox.ps1`（PowerShell 7.4以降）。固定モデル・CORE・Runtime・許諾を取得 | `.local/vendor/voicevox/package/` |
+| 4. 追加HTS音声 | 固定入力節の東北大4モデルの配置と`./native/prepare-mmdagent-voices.ps1` | `.local/vendor/tohoku-f01/`、`.local/vendor/mmdagent/1.8/` |
+| 5. 開発用Python | Python 3.12.14 x64と下記venv。OpenVoice変換は固定requirementsも導入 | `.local/neural-openvoice/venv/` |
+| 6. Supertonic | `./native/prepare-supertonic.ps1 -Download`。上記Python・LLVMのreadobjと同じフォルダーのclang・VOICEVOXのCRTを使用 | `.local/vendor/supertonic/prepared-md-vc143/` |
+| 7. Aivis／JVNV | 固定入力節の`prepare-aivis.ps1`→`prepare-jvnv.ps1`→`-JvnvDirectory`付き再package。各固定原本・wheelも事前に必要 | 新規`package-<ID>/`を`$env:AivisDirectory`に指定 |
+| 8. NIT＋OpenVoice | 本書のOpenVoiceモデル変換・ORTビルド・資産配置手順。NIT、固定モデル、監査済みORT、CRT、許諾・対象ソースが必要 | `.local/build/native-openvoice/` |
+| 9. 監査済みUI描画 | 本書の`build-skia.ps1`と`SkiaNative.targets`の手順。固定ソース／C++環境と4 DLLのハッシュを照合 | `.local/build/native-skia/` |
+
+**VOICEVOX・Supertonic・Aivisも、現行のプロジェクト定義ではOpen JTalkの準備が前提。** packageだけを置いても、Open JTalkが無効な構成には同梱されない。判定・入力先は[Tanayomi.Desktop.csproj](src/Tanayomi.Desktop/Tanayomi.Desktop.csproj)を参照する。
+
+Pythonは利用者側の必須環境ではない。上記TEMP設定をしたシェルで、用意したPython 3.12.14の実体から`& 'Python本体の絶対パス' -m venv .local/neural-openvoice/venv`を実行する。以後は`.local/neural-openvoice/venv/Scripts/python.exe`を使う。OpenVoice変換の固定依存導入コマンドは後述の`openvoice-export-requirements.txt`の説明を参照する。Aivisの製品用Python／wheelは別の固定入力であり、このvenvをそのまま製品へコピーしない。
+
+Skia／OpenVoiceのC++再構築には、スクリプトが固定するMSVC 14.29.30037（compiler 19.29.30038.1）、Windows SDK 10.0.19041.0、Ninja、OpenVoiceではCMake 3.31.6が必要。SkiaスクリプトはVS 2019 Build Toolsの既定パスを参照する。Visual Studio最新版を入れただけで同じ成果物になるとは限らず、別ツールチェーンへの変更には再監査が必要。ビルドツールと再配布物の条件はTHIRD_PARTY_NOTICESを確認する。
+
+これは全音声の自動bootstrapではない。Open JTalk原典、Aivis固定原本／wheel、ORTソース、監査済みDLLの採用配置などに手動工程が残る。Skiaのmanifestがない通常ビルドではNuGet由来のnativeを使用するため、監査済みアプリと同一の配布構成とは扱わない。DLL・manifestだけを別版へ差し替えたり、ハッシュ検査を無効にして合わせたりしない。
+
+準備後は`./dev.ps1 test -Configuration Release`、`./dev.ps1 publish`、[合成方式の製品確認](#合成方式の製品確認)と固定入力節の対象製品試験を実施する。完成先は`.local/build/app/Tanayomi.Desktop.exe`。`resources/`の対象音声資産と画面の選択肢も確認する。検証済み出力の利用者用コピーは`./dev.ps1 tryout -UseExistingPublish`で新規作成できる。資産を変更した後に古いpublishを再利用しない。
+
+### ビルド・実行・試験
 
 SDK版は`global.json`、依存パッケージ版はプロジェクト定義と`packages.lock.json`で固定する。リポジトリ直下からPowerShell 7以降で[dev.ps1](dev.ps1)を使用する。
 
@@ -71,7 +145,7 @@ Unix向けWORLDの監査用入力は[native/build-world-unix.ps1](native/build-w
 
 ### 検証と一時出力
 
-`dev.ps1 test`は`tests/Tanayomi.Tests/`の試験を実行する。入力はリポジトリ内のソース・同梱音源・辞書。Windows PowerShellと固定版.NET SDKを使用し、試験結果は文字出力で確認する。fixtureやモデル用音源は`.local/tmp/`の一意な試験領域へ置き、終了時に成功・失敗とも清掃する。通常の試験で合成サンプル音声を自動保存しない。
+`dev.ps1 test`は`tests/Tanayomi.Tests/`の試験を実行する。入力はリポジトリ内のソース・同梱音源・辞書。PowerShell 7以降と固定版.NET SDKを使用し、試験結果は文字出力で確認する。fixtureやモデル用音源は`.local/tmp/`の一意な試験領域へ置き、終了時に成功・失敗とも清掃する。通常の試験で合成サンプル音声を自動保存しない。
 
 `dev.ps1 preview`はランナーの`--render`を使って画面を描画し、PC幅・390px幅の画像を`.local/previews/`へ保存する。Supertonicの同意画面も`supertonic-terms-closed/open/narrow.png`へ出力し、展開時は規約本文と同意ボタンが見える位置へスクロールする。準備済みの規約全文がある場合は固定SHAで照合して使用し、未準備なら試験用本文を使う。これは明示的な確認用出力としてレビュー後に削除する。
 
@@ -134,7 +208,7 @@ python assets/build-reading-dictionary.py
 
 ## Open JTalkの固定入力
 
-再利用する公式入力は`.local/vendor/open-jtalk/`の`open_jtalk-1.11.tar.gz`、`open_jtalk_dic_utf_8-1.11.tar.gz`、`hts_engine_API-1.10.tar.gz`、`hts_voice_nitech_jp_atr503_m001-1.05.tar.gz`。取得元・固定サイズ・SHA-256・条件は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#追加音源の条件調査詳細)から辿れる。作業場所はリポジトリ直下で、既存入力の照合は`Get-FileHash .local/vendor/open-jtalk/*.tar.gz -Algorithm SHA256`で行う。アーカイブは取得入力として保持し、まだ実行物や製品へ同梱したものではない。再取得では対象の公式リンクを使い、既存ファイルを上書きせずhashを照合する。
+再利用する公式入力は`.local/vendor/open-jtalk/`の`open_jtalk-1.11.tar.gz`、`open_jtalk_dic_utf_8-1.11.tar.gz`、`hts_engine_API-1.10.tar.gz`、`hts_voice_nitech_jp_atr503_m001-1.05.tar.gz`。取得元・固定サイズ・SHA-256・条件は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#追加音源の条件調査詳細)から辿れる。作業場所はリポジトリ直下で、既存入力の照合は`Get-FileHash .local/vendor/open-jtalk/*.tar.gz -Algorithm SHA256`で行う。アーカイブ自体は開発用の取得入力として保持する。アプリ一式には、準備したDLL・辞書・モデルをresourcesへ別途配置する。再取得では対象の公式リンクを使い、既存ファイルを上書きせずhashを照合する。
 
 辞書binaryは展開すると約107.3MB（`sys.dic`だけで約103.1MB）、モデル本体は約1.17MB。製品へ含める場合は辞書も配布サイズに加わり、モデルだけでは動かない。既存のUTAU用読み辞書は情報・形式が異なり、そのまま代用しない。
 
@@ -152,7 +226,7 @@ Unixのライブラリー監査判定は、リポジトリ直下のPowerShell 7�
 
 Mei 1.5の5音声とTakumi 1.0の4音声は、リポジトリ直下で `./native/prepare-mmdagent-voices.ps1` によりMMDAgent Example 1.8公式ZIPから準備する。公式SHAと各モデルSHA・HTS形式を照合し、音声と原典README/COPYRIGHTだけを `.local/vendor/mmdagent/1.8/` へ置く。取得済みZIPは `-ArchivePath <リポジトリ内の絶対パス>` で指定できる。PowerShell 7/.NET標準機能を使い、新規一時領域は成功・失敗とも清掃する。通常ビルドは同ディレクトリーの9モデルと `assets/mmdagent-*-COPYRIGHT.txt`、`assets/mmdagent-voices-NOTICE.txt` を既存のresources/許諾へ配置する。実体と表示条件は[THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES.md)を参照。MMDAgent本体・3D素材は配布しない。
 
-VOICEVOXの内蔵Windows CPU構成は `./native/prepare-voicevox.ps1` で固定CORE・専用Runtime・対象VVM・VC Runtimeと許諾文を取得し、`.local/vendor/voicevox/package/` へ準備する。取得済み入力だけを使う確認は `-Offline`。PowerShell 7が必要で、公式資産のSHA・DLL依存を照合し、辞書は上記のOpen JTalk辞書を共用する。通常Windowsビルドはこのpackageを `resources/voicevox/` へ配置する。対象話者は `src/Tanayomi.Desktop/VoicevoxCatalog.cs` の固定一覧で、別エンジンの起動やインストールを要求しない。
+VOICEVOXの内蔵Windows CPU構成は `./native/prepare-voicevox.ps1` で固定CORE・専用Runtime・対象VVM・VC Runtimeと許諾文を取得し、`.local/vendor/voicevox/package/` へ準備する。取得済み入力だけを使う確認は `-Offline`。PowerShell 7.4以降が必要で、公式資産のSHA・DLL依存を照合し、辞書は上記のOpen JTalk辞書を共用する。通常Windowsビルドはこのpackageを `resources/voicevox/` へ配置する。対象話者は `src/Tanayomi.Desktop/VoicevoxCatalog.cs` の固定一覧で、別エンジンの起動やインストールを要求しない。
 
 Supertonic 3はリポジトリ直下で `./native/prepare-supertonic.ps1 -Download` により固定sherpa-onnx 2.0.1・INT8モデル・許諾・対応ソースを準備する。開発用Pythonは既定の `.local/neural-openvoice/venv/Scripts/python.exe`、PE検査は `.local/vendor/llvm-mingw/llvm-mingw-20261020-msvcrt-x86_64/bin/llvm-readobj.exe`、VC Runtimeは上記VOICEVOXの準備済み資産を使う。必要なら `-Python`・`-ReadObj`・`-CrtDirectory` でリポジトリ内の実体を指定する。取得済み入力で再検査する場合は `-Download` を外す。出力 `.local/vendor/supertonic/prepared-md-vc143/` のモデル・DLL・licensesだけを通常Windowsビルドで `resources/supertonic/` へ配置する。
 

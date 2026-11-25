@@ -1,14 +1,13 @@
 # 現在の作業
 
-更新日時：2026-11-23 18:43:41 +09:00。引き継ぎID：20261123-06。
+更新日時：2026-11-25 15:13:01 +09:00。引き継ぎID：20261125-02。
 依頼一覧・優先順はPROJECT_STATUS.md。R26はユーザーの明示終了まで未完。Windows以外と公開配布は保留。
 
 ## 現在の目的・到達点
 
-最新依頼：NIT＋OpenVoiceの『間延びモード』を追加し、完了後 https://github.com/hosinohito/tanayomi.git にソース/文書をpush。UI/core/nativeの実装・共通2679/native40/製品79+plan6成功。既定OFF修正版、ON修正前の長さ、次発言snapshot・保存復元・切替cache破棄。他方式/標準NIT不変。追加native export toj_synthesize_drawn_out、採用audit183016-4b48d01c、DLL 200C9249E57DF9BEF944E59B083054C667A96629AA8586300B04F025B3192FD7。
-
-次操作：今回の機能実装/検証/新copy/GitHub初回pushは完了。mainの初回commit cab389e0a9a21da2ba15f2a5e824c6d4d87c17f0をoriginへ反映済み。この完了記録を追記commit/pushして整合を確認する。新しい機能の次作業は未指示。R26は既存の根拠確認条件で未完。remote既存refsなしを確認済み。Git初期化とlocal credential.helper manager/credentialStore wincredmanのみ設定し、global safe.directoryは変更しない。Gitは利用者所有のため非管理者の正式利用者権限を使う。tokenはregister-github-token.ps1の非表示stdin→Windows資格情報、秘密表示/ファイル保存なし。利用者は登録済みと回答。GitHub CLIは未導入で不使用。PowerShell7はC:/Users/hoshi/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/powershell/pwsh.exeを使用可。
-
+最新依頼：開発環境の準備手順を適切な文書へ記載してpushする。
+対応：READMEへWindows初回準備（Git/PowerShell 7.4以上/固定.NET SDK/保存先/locked restore）と全音声の準備順、Python/C++前提、手動工程・監査済みSkiaの違いを追記。実スクリプト・csprojと照合し、全相対リンク実在・PowerShellコードブロック構文を確認。新規環境の全再構築は今回未実施。製品コード・既存環境・試用版/dataは変更していない。
+次操作：文書4件をcommitしてorigin/mainへpushし、remote SHAと一致を確認する。前回のpushは9b9b03fで確認済み。公開実行物・本体ライセンスは引き続き保留。今回の文書依頼はpush照合をもって完了。
 容量：完了ORT col2im/fusedの再生成可能LIB/OBJ252個1,400,306,855bytesを検査後清掃。最初のpublish resources抑制は効かず容量不足、失敗したbin/resourcesのみ安全清掃してcsprojの明示metadataへ修正。再publish成功、通常buildコピー維持。旧141155版削除の個別承認ありだが、実行時に指定フォルダーが既に消えており削除せず。空き約28GBへ変化したことを観測。181159版/dataを保護して新183929版の作成・照合完了。
 前提：通常モードの長文修正は利用者が『治った』と確認済み。今回ONはその修正前を意図して選ぶ機能。品質比較の詳細はRESEARCH、履歴はWORK_LOG。
 
