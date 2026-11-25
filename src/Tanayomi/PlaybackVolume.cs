@@ -20,9 +20,11 @@ public sealed class PlaybackVolume
     // One transformation takes one snapshot. The owner decides when to invoke
     // it; this does not establish the UI's live-change or persistence policy.
     public PlaybackVolumeResult Apply(ReadOnlyMemory<short> samples, CancellationToken ct = default)
+        => Apply(samples, Percent, ct);
+
+    internal static PlaybackVolumeResult Apply(ReadOnlyMemory<short> samples, int selected, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        var selected = Percent;
         if (selected == 0) return new(true, ReadOnlyMemory<short>.Empty);
         if (selected == 100) return new(false, samples);
         var result = new short[samples.Length];
@@ -63,12 +65,21 @@ public sealed class VolumePcmOutput : IPcmOutput
     }
 
     public Task PlayAsync(ReadOnlyMemory<short> samples, int sampleRate, CancellationToken cancellationToken)
+        => PlayAsync(samples, sampleRate, volume.Percent, cancellationToken);
+
+    internal Func<ReadOnlyMemory<short>, int, CancellationToken, Task> SnapshotPlayback()
+    {
+        var percent = volume.Percent;
+        return (samples, rate, ct) => PlayAsync(samples, rate, percent, ct);
+    }
+
+    private Task PlayAsync(ReadOnlyMemory<short> samples, int sampleRate, int percent, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
         if (sampleRate is < 8000 or > 192000 || samples.Length < 1 || samples.Length > sampleRate * 60)
             throw new ArgumentOutOfRangeException(nameof(samples));
-        var adjusted = volume.Apply(samples, cancellationToken);
+        var adjusted = PlaybackVolume.Apply(samples, percent, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return adjusted.IsMuted ? Task.CompletedTask : output.PlayAsync(adjusted.Samples, sampleRate, cancellationToken);
     }

@@ -16,6 +16,42 @@ internal static class Program
     {
         try
         {
+            if (args.Length is 1 or 2 && args[0] == "--utau-lead-handoff-check")
+            {
+                UtauLeadHandoffTests.RunAsync(Check, args.Length == 2 ? args[1] : null).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} UTAU lead handoff checks");
+                return 0;
+            }
+            if (args.Length is 1 or 2 && args[0] == "--utau-lexical-accent-check")
+            {
+                UtauLexicalAccentTests.RunAsync(Check, args.Length == 2 ? args[1] : null).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} UTAU lexical accent checks");
+                return 0;
+            }
+            if (args.Length is 1 or 2 && args[0] == "--utau-overlap-envelope-check")
+            {
+                UtauOverlapEnvelopeTests.RunAsync(Check, args.Length == 2 ? args[1] : null).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} UTAU overlap envelope checks");
+                return 0;
+            }
+            if (args.Length is 1 or 2 && args[0] == "--utau-continuous-pitch-check")
+            {
+                UtauContinuousPitchTests.RunAsync(Check, args.Length == 2 ? args[1] : null).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} UTAU continuous pitch checks");
+                return 0;
+            }
+            if (args.Length is 1 or 2 && args[0] == "--utau-voiced-join-check")
+            {
+                UtauVoicedJoinTests.RunAsync(Check, args.Length == 2 ? args[1] : null).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} UTAU voiced join checks");
+                return 0;
+            }
+            if (args.Length == 1 && args[0] == "--utau-prefetch-trial-check")
+            {
+                UtauSimplePrefetchTests.RunAsync(Check, benchmark: true).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} UTAU prefetch trial checks");
+                return 0;
+            }
             if (args.Length == 1 && args[0] == "--windows-volume-boost-check")
             {
                 DesktopSpeechTests.RunWindowsVolumeBoostCheck(Check);
@@ -191,6 +227,11 @@ internal static class Program
         await DesktopSpeechTests.RunAsync(Check);
         await DesktopPcmOutputTests.RunAsync(Check);
         await UtauTests.RunAsync(Check);
+        await UtauSimplePrefetchTests.RunAsync(Check);
+        await UtauVoicedJoinTests.RunAsync(Check);
+        await UtauContinuousPitchTests.RunAsync(Check);
+        await UtauOverlapEnvelopeTests.RunAsync(Check, null);
+        await UtauLexicalAccentTests.RunAsync(Check);
         await UtauPostprocessorTests.RunAsync(Check);
         await UtauContextTests.RunAsync(Check);
         await UtauCvvcSlicesTests.RunAsync(Check);

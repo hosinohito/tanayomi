@@ -8,9 +8,17 @@ namespace Tanayomi;
 public static class JapaneseReading
 {
     private readonly record struct Word(string Surface, string Reading, ushort Left, ushort Right, short Cost);
-    private sealed record Node(int Cost, ushort Right, string Reading, Node? Previous);
+    private sealed record Node(int Cost, ushort Right, string Reading, Node? Previous, int WordIndex = -1);
     private sealed record DictionaryData(Word[] Words, short[] Transitions, int Width, int MaximumWordLength);
     private static readonly Lazy<DictionaryData> Data = new(Load);
+    private static readonly Lazy<byte[]> AccentData = new(LoadAccents);
+    internal readonly record struct AccentSpan(int Offset, string Reading, int Drop, int MoraCount);
+
+    internal static (string Reading, IReadOnlyList<AccentSpan> Accents) ToAccentReading(string text, CancellationToken ct)
+    {
+        var accents = new List<AccentSpan>();
+        return (ToReading(text, true, ct, accents), accents);
+    }
     private static readonly string[] Letters = ["えー", "びー", "しー", "でぃー", "いー", "えふ", "じー", "えいち", "あい", "じぇー", "けー", "える", "えむ", "えぬ", "おー", "ぴー", "きゅー", "あーる", "えす", "てぃー", "ゆー", "ぶい", "だぶりゅー", "えっくす", "わい", "ぜっと"];
     private static readonly string[] Digits = ["ぜろ", "いち", "に", "さん", "よん", "ご", "ろく", "なな", "はち", "きゅー"];
 
@@ -26,7 +34,7 @@ public static class JapaneseReading
     public static string ToProsodicReading(string text, CancellationToken cancellationToken = default) =>
         ToReading(text, preservePhraseEnd: true, cancellationToken);
 
-    private static string ToReading(string text, bool preservePhraseEnd, CancellationToken cancellationToken)
+    private static string ToReading(string text, bool preservePhraseEnd, CancellationToken cancellationToken, List<AccentSpan>? accents = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         if (text.Length > 1024) throw new InvalidDataException("読み上げ文が長すぎます。");
@@ -43,7 +51,7 @@ public static class JapaneseReading
             {
                 var start = i++;
                 while (i < text.Length && IsJapanese(text[i])) i++;
-                result.Append(ReadJapanese(text[start..i], cancellationToken));
+                ReadJapanese(text[start..i], cancellationToken, result, accents);
             }
             else
             {
@@ -75,7 +83,7 @@ public static class JapaneseReading
     private static bool IsJapanese(char c) => c is >= '\u3041' and <= '\u30ff' or >= '\u3400' and <= '\u9fff' or '々' or '〆' or '〇';
     internal static string Hiragana(string value) => string.Concat(value.Select(c => c is >= 'ァ' and <= 'ヶ' ? (char)(c - 0x60) : c));
 
-    private static string ReadJapanese(string text, CancellationToken ct)
+    private static void ReadJapanese(string text, CancellationToken ct, StringBuilder output, List<AccentSpan>? accents)
     {
         var data = Data.Value;
         var paths = new List<Node>?[text.Length + 1];
@@ -113,7 +121,7 @@ public static class JapaneseReading
                         bestCost = cost;
                     }
                     (paths[start + length] ??= []).Add(new(best.Cost + data.Transitions[best.Right * data.Width + word.Left] + word.Cost,
-                        word.Right, word.Reading, best));
+                        word.Right, word.Reading, best, index - 1));
                 }
             }
             var c = text[start];
@@ -127,9 +135,21 @@ public static class JapaneseReading
         }
         if (paths[^1] is not { Count: > 0 } end) throw new InvalidDataException("辞書にない漢字の読みを変換できません。");
         var last = end.MinBy(n => n.Cost + data.Transitions[n.Right * data.Width])!;
-        var pieces = new Stack<string>();
-        for (var node = last; node.Previous is not null; node = node.Previous) pieces.Push(node.Reading);
-        return string.Concat(pieces);
+        var pieces = new Stack<Node>();
+        for (var node = last; node.Previous is not null; node = node.Previous) pieces.Push(node);
+        foreach (var node in pieces)
+        {
+            if (accents is null) { output.Append(node.Reading); continue; }
+            var reading = Hiragana(node.Reading).Replace("’", "", StringComparison.Ordinal).Replace("'", "", StringComparison.Ordinal);
+            if (node.WordIndex >= 0)
+            {
+                var accent = AccentData.Value;
+                var at = node.WordIndex * 2;
+                if (accent[at] != 255)
+                    accents.Add(new(output.Length, reading, accent[at], accent[at+1]));
+            }
+            output.Append(reading);
+        }
     }
 
     private static int LowerBound(Word[] words, ReadOnlySpan<char> surface)
@@ -142,6 +162,20 @@ public static class JapaneseReading
             else high = middle;
         }
         return low;
+    }
+
+    private static byte[] LoadAccents()
+    {
+        using var source = typeof(JapaneseReading).Assembly.GetManifestResourceStream("Tanayomi.naist-jdic-accents.bin.gz")
+            ?? throw new InvalidDataException("アクセント辞書が見つかりません。");
+        using var gzip = new GZipStream(source, CompressionMode.Decompress);
+        using var reader = new BinaryReader(gzip, Encoding.UTF8);
+        var count = Data.Value.Words.Length;
+        if (Encoding.ASCII.GetString(reader.ReadBytes(5)) != "TYAC1" || reader.ReadInt32() != count)
+            throw new InvalidDataException("アクセント辞書が読み辞書と一致しません。");
+        var result = reader.ReadBytes(count * 2);
+        if (result.Length != count * 2 || reader.BaseStream.ReadByte() != -1) throw new InvalidDataException();
+        return result;
     }
 
     private static DictionaryData Load()

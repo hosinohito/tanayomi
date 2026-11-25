@@ -157,6 +157,10 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
     internal int SourceInspectionAnalysisCount { get; private set; }
     internal int SourceInspectionCacheHitCount { get; private set; }
     private bool acousticContextRendering;
+    internal bool SimpleSourceAnchoredPitchEnabled { get; init; } = OperatingSystem.IsWindows() &&
+        Environment.GetEnvironmentVariable("TANAYOMI_UTAU_SOURCE_ANCHORED_PITCH") != "0";
+    internal bool SimplePitchPreserveEnergy { get; init; } =
+        Environment.GetEnvironmentVariable("TANAYOMI_UTAU_PITCH_PRESERVE_ENERGY") != "0";
     private UtauTimingAllocation[]? comparisonTimingPlan;
     private Dictionary<int, UtauLandmarkOverride>? comparisonLandmarks;
     private List<UtauSourceRange>? comparisonSourceRanges;
@@ -238,6 +242,11 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
 
     internal async Task SpeakWithVoicebankAsync(string text, Voicebank? bank, CancellationToken cancellationToken)
     {
+        if (SimplePrefetchEnabled && Mode == UtauSynthesisMode.Simple && bank is not null && !diagnosticConfigured)
+        {
+            await SpeakSimplePrefetchedAsync(text, bank, cancellationToken).ConfigureAwait(false);
+            return;
+        }
         var audio = await SynthesizeAsync(text, bank, cancellationToken).ConfigureAwait(false);
         await output.PlayAsync(audio.Samples, audio.SampleRate, cancellationToken).ConfigureAwait(false);
     }
@@ -519,12 +528,44 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         bank.Entries.GroupBy(e => JapaneseReading.Hiragana(e.Alias.Normalize()), StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
 
-    private static UtauReadingUnit[] ParseReading(string reading, CancellationToken ct)
+    internal static UtauReadingUnit[] ParseSimpleAccentReading(string text, CancellationToken ct)
+    {
+        var plan = JapaneseReading.ToAccentReading(text, ct);
+        var offsets = new List<int>();
+        var units = ParseReading(plan.Reading, ct, offsets);
+        offsets.Add(plan.Reading.Length);
+        foreach (var token in plan.Accents)
+        {
+            var first = offsets.BinarySearch(token.Offset);
+            var end = offsets.BinarySearch(token.Offset + token.Reading.Length);
+            // Unknowns, mismatches and collapsed long-vowel placements retain
+            // the existing continuous contour, rather than guessing an accent.
+            if (first < 0 || end <= first || end - first != token.MoraCount ||
+                !plan.Reading.AsSpan(token.Offset, token.Reading.Length).SequenceEqual(token.Reading.AsSpan())) continue;
+            if (Enumerable.Range(first, end - first).Any(j => units[j].Pause != '\0' || units[j].Extensions != 0)) continue;
+            var highFrom = token.Drop == 1 ? first : first + 1;
+            var highTo = token.Drop == 0 ? end : first + token.Drop;
+            // Let the ending particle of a flat noun remain high. Don't
+            // infer attachment for an arbitrary following word.
+            if (token.Drop == 0 && end < units.Length &&
+                (end + 1 == units.Length || units[end + 1].Pause is '。' or '、' or '?') &&
+                units[end].Alias is "が" or "を" or "の" or "に" or "は" or "も") highTo++;
+            for (var i = highFrom; i < highTo; i++) units[i] = units[i] with { LexicalHigh = true };
+        }
+        return units;
+    }
+
+    private UtauReadingUnit[] ReadSimpleOrStandard(string text, CancellationToken ct) =>
+        simpleRendering && SimplePitchContourEnabled && SimpleLexicalAccentEnabled ?
+            ParseSimpleAccentReading(text, ct) : ParseReading(JapaneseReading.ToProsodicReading(text, ct), ct);
+
+    private static UtauReadingUnit[] ParseReading(string reading, CancellationToken ct, List<int>? offsets = null)
     {
         var units = new List<UtauReadingUnit>();
         for (var i = 0; i < reading.Length; i++)
         {
             ct.ThrowIfCancellationRequested();
+            offsets?.Add(i);
             var c = reading[i];
             if (c is '、' or '。' or '?' or '・' or ' ')
             {
@@ -549,15 +590,16 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         return units.ToArray();
     }
 
-    private PcmAudio Synthesize(string text, Voicebank bank, CancellationToken ct, UtauReadingUnit[]? preparedReading = null)
+    private PcmAudio Synthesize(string text, Voicebank bank, CancellationToken ct, UtauReadingUnit[]? preparedReading = null,
+        PrefetchEdges? prefetch = null, Dictionary<string, OtoEntry>? preparedAliases = null)
     {
         if (diagnosticActive) { unitCapture = null; UnitDiagnostics = null; UnitDiagnosticAudio = null; }
-        var reading = preparedReading ?? ParseReading(JapaneseReading.ToProsodicReading(text, ct), ct);
+        var reading = preparedReading ?? ReadSimpleOrStandard(text, ct);
         if (comparisonTimingPlan is { } plan && (plan.Length != reading.Length ||
             reading.Where((unit, index) => unit.Alias != plan[index].Alias || unit.Pause != plan[index].Pause ||
                 unit.Extensions != plan[index].Extensions).Any()))
             throw new InvalidDataException("時間計画と音源の読みが一致しません。");
-        var aliases = Aliases(bank);
+        var aliases = preparedAliases ?? Aliases(bank);
         var units = new List<(Mora? Sound, char Pause)>();
         var contextFriction = acousticContextRendering && !DisableContextFrictionForComparison;
         var contextDeclined = contextFriction ? new Dictionary<int, string>() : null;
@@ -602,7 +644,10 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         // not render extra reference vowels merely to compute an unused value.
         var referencePeriod = legacyRendering && ApplyPitch ? ReferencePeriod(bank, aliases, ct) : 0;
         var result = new List<float>(OutputSampleRate * 4);
+        var pitchTracks = simpleRendering && SimplePitchContourEnabled ?
+            CreateContinuousPitchTracks(units, reading, ReferencePeriod(bank, aliases, ct, inspectOnly: true), ct, SimpleSourceAnchoredPitchEnabled) : null;
         var previousVowel = 0;
+        var previousPeriod = 0d;
         var phraseStart = 0;
         var phraseEnd = 0;
         for (var i = 0; i < units.Count; i++)
@@ -615,7 +660,7 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 if (comparisonTimingPlan is { } timings) AddSilenceSamples(result, timings[i].DurationSamples);
                 else AddSilence(result, pause == 'っ' ? 85 : 110);
                 timingAnchors?.Add(new(i, null, pause, 0, pauseStart, null, result.Count));
-                previousVowel = 0; continue;
+                previousVowel = 0; previousPeriod = 0; continue;
             }
             if (i >= phraseEnd)
             {
@@ -655,7 +700,19 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 Math.Min(advance, Math.Max(1, fadeOverlap)), voicedLead));
             if (diagnosticActive && i == diagnosticUnit)
                 unitCapture?.ObserveAppend(result, sound.Samples, advance, fadeOverlap, ct);
-            var start = Append(result, sound.Samples, advance, fadeOverlap);
+            var activeTrack = pitchTracks?[i];
+            if (activeTrack is { } track)
+                track.Pitch.Apply(sound.Samples, result.Count - advance - track.Origin, sound.Period, ct, SimplePitchPreserveEnergy, SimpleSourceAnchoredPitchEnabled);
+            if (activeTrack is not null && SimpleAttackEnvelopeEnabled)
+                UtauAttackEnvelope.Attenuate(sound.Samples, sound.Preutterance,
+                    reading[i].Alias is "あ" or "い" or "う" or "え" or "お" or "を");
+            var continuousJoin = activeTrack is null && simpleRendering && SimpleVoicedJoinsEnabled && voicedLead && advance > 0 &&
+                UtauVoicedJoin.TryBlend(CollectionsMarshal.AsSpan(result)[^advance..], sound.Samples.AsSpan(0, advance),
+                    previousVowel, sound.Overlap, previousPeriod, sound.Period, ct);
+            // A successful join already mixed the intersection in place.
+            var start = Append(result, sound.Samples, advance, fadeOverlap, continuousJoin,
+                complementary: activeTrack is not null && SimpleComplementaryEnvelopeEnabled,
+                adaptiveLead: activeTrack is not null && SimpleLeadHandoffEnabled && !voicedLead);
             if (diagnosticActive && i == diagnosticUnit) UnitDiagnostics = unitCapture?.Snapshot();
             if (joinObservations is not null && advance > 0)
                 joinObservations.Add(ObserveJoin(result, sound, i, reading[i - 1].Alias!, reading[i].Alias!,
@@ -663,18 +720,27 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
             timingAnchors?.Add(new(i, reading[i].Alias, '\0', reading[i].Extensions,
                 start, start + (sound.MappedVowelOnset ?? sound.Preutterance), start + sound.Samples.Length));
             previousVowel = sound.Samples.Length - sound.Preutterance;
+            previousPeriod = sound.Period;
         }
         if (result.Count == 0 || result.All(x => Math.Abs(x) < 0.0001f)) throw new InvalidDataException("音源から有効な音声を生成できません。");
         // One gain for the utterance preserves the bank's relative consonant/vowel
         // levels. Summed transitions receive headroom without per-mora pumping.
-        var peak = OutputPeak(result);
-        var gain = Math.Min(1f, 0.92f / peak);
+        // A streaming continuation cannot know the peak of future phrases.
+        // Use fixed headroom rather than changing the relative gain at each
+        // boundary; the legacy one-piece path retains peak normalization.
+        var gain = prefetch is null ? Math.Min(1f, 0.92f / OutputPeak(result)) : 0.92f;
         var fade = Math.Min(OutputSampleRate / 200, result.Count / 2);
         {
             var samples = CollectionsMarshal.AsSpan(result);
-            for (var i = 0; i < samples.Length; i++) samples[i] *= gain;
+            if (prefetch is null)
+                for (var i = 0; i < samples.Length; i++) samples[i] *= gain;
+            else
+                for (var i = 0; i < samples.Length; i++) samples[i] = Math.Clamp(samples[i] * gain, -0.92f, 0.92f);
         }
-        for (var i = 0; i < fade; i++) { result[i] *= Fade(i, fade); result[^(i + 1)] *= Fade(i, fade); }
+        if (prefetch is not { First: false })
+            for (var i = 0; i < fade; i++) result[i] *= Fade(i, fade);
+        if (prefetch is not { Last: false })
+            for (var i = 0; i < fade; i++) result[^(i + 1)] *= Fade(i, fade);
         return new(QuantizePcm(result), OutputSampleRate);
     }
 
@@ -780,7 +846,79 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
             Rms(joined, onset - before, before), Rms(joined, onset, OutputSampleRate / 50));
     }
 
-    private double ReferencePeriod(Voicebank bank, Dictionary<string, OtoEntry> aliases, CancellationToken ct)
+    private static (UtauContinuousPitch Pitch, int Origin)?[]? CreateContinuousPitchTracks(
+        List<(Mora? Sound, char Pause)> units, UtauReadingUnit[] reading, double basePeriod, CancellationToken ct, bool centerOnVoicedStarts)
+    {
+        if (basePeriod is < 60 or > 490 || !double.IsFinite(basePeriod)) return null;
+        var tracks = new (UtauContinuousPitch Pitch, int Origin)?[units.Count];
+        var position = 0;
+        var previousVowel = 0;
+        var first = 0;
+        var origin = 0;
+        var edges = new List<int>();
+        var high = false;
+        for (var i = 0; i <= units.Count; i++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var pause = i == units.Count ? '\0' : units[i].Pause;
+            if (i == units.Count || pause is '。' or '、' or '?')
+            {
+                if (i > first && position > origin)
+                {
+                    if (high) edges.Add(position - origin);
+                    var centerPeriod = basePeriod;
+                    if (centerOnVoicedStarts)
+                    {
+                        // One center for the whole phrase. Read confident voiced
+                        // attacks, not consonants, and temper octave errors with the
+                        // bank's usual pitch. Never reset the target at each mora.
+                        var observed = new List<double>(5);
+                        var width = OutputSampleRate * 35 / 1000;
+                        for (var j = first; j < i && observed.Count < 5 && j < first + 8; j++)
+                        {
+                            if (units[j].Sound is not { } note) continue;
+                            var at = note.Preutterance + OutputSampleRate / 100;
+                            if (at + width > note.Samples.Length) continue;
+                            var probe = note.Samples.AsSpan(at, width);
+                            var period = UtauPitch.FindPeriod(probe, ct);
+                            if (period >= basePeriod * 0.6 && period <= basePeriod * 1.75 &&
+                                UtauPitch.IsVoiced(probe, period)) observed.Add(period);
+                        }
+                        if (observed.Count >= 3)
+                        {
+                            observed.Sort();
+                            centerPeriod = Math.Clamp(observed[observed.Count / 2], basePeriod / 1.32, basePeriod * 1.32);
+                        }
+                    }
+                    var track = new UtauContinuousPitch(position - origin, centerPeriod, pause == '?', ct, edges.ToArray());
+                    for (var j = first; j < i; j++) if (units[j].Sound is not null) tracks[j] = (track, origin);
+                }
+                high = false; edges.Clear();
+                first = i + 1;
+                origin = position + 110 * OutputSampleRate / 1000;
+            }
+            if (i == units.Count) break;
+            if (units[i].Sound is { } sound)
+            {
+                if (reading[i].LexicalHigh != high)
+                {
+                    edges.Add(position - origin + Math.Max(0, sound.Preutterance - previousVowel));
+                    high = reading[i].LexicalHigh;
+                }
+                position += sound.Samples.Length - Math.Min(previousVowel, sound.Preutterance);
+                previousVowel = sound.Samples.Length - sound.Preutterance;
+            }
+            else
+            {
+                position += (pause == 'っ' ? 85 : 110) * OutputSampleRate / 1000;
+                previousVowel = 0;
+            }
+            if (position > MaximumSamples) throw new InvalidDataException("合成音声が長すぎます。");
+        }
+        return tracks;
+    }
+
+    private double ReferencePeriod(Voicebank bank, Dictionary<string, OtoEntry> aliases, CancellationToken ct, bool inspectOnly = false)
     {
         // A small fixed set makes the voice's baseline independent of chat text.
         // Do not decode an entire bank merely to estimate its habitual pitch.
@@ -801,7 +939,7 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
             ct.ThrowIfCancellationRequested();
             try
             {
-                var period = RenderMora(bank, entry, 0, ct).Period;
+                var period = inspectOnly ? InspectMoraSource(bank, entry, ct).Period : RenderMora(bank, entry, 0, ct).Period;
                 if (period > 0) periods.Add(period);
             }
             catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException)
@@ -1397,19 +1535,26 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         return result;
     }
 
-    private static int Append(List<float> destination, float[] samples, int requestedOverlap, int fadeOverlap)
+    internal static int Append(List<float> destination, float[] samples, int requestedOverlap, int fadeOverlap,
+        bool intersectionMixed = false, bool complementary = false, bool adaptiveLead = false)
     {
         var overlap = Math.Min(Math.Min(destination.Count, samples.Length), requestedOverlap);
         var start = destination.Count - overlap;
         if ((long)destination.Count + samples.Length - overlap > MaximumSamples)
             throw new InvalidDataException("合成音声が長すぎます。");
-        for (var i = 0; i < overlap; i++)
+        var fade = Math.Min(overlap, Math.Max(1, fadeOverlap));
+        var delay = adaptiveLead && complementary && !intersectionMixed && overlap > 0
+            ? UtauLeadHandoff.Delay(CollectionsMarshal.AsSpan(destination)[start..], samples.AsSpan(0, overlap), fade)
+            : 0;
+        for (var i = 0; !intersectionMixed && i < overlap; i++)
         {
-            // The incoming onset already has a 2ms ramp. Do not attenuate its
-            // consonant across the bank's potentially long preutterance overlap.
-            var fade = Math.Min(overlap, Math.Max(1, fadeOverlap));
-            var previous = i < fade ? destination[destination.Count - overlap + i] * (1 - Fade(i, fade)) : 0;
-            destination[destination.Count - overlap + i] = previous + samples[i];
+            var weight = i < delay ? 0 : i - delay < fade ? Fade(i - delay, fade) : 1;
+            var outputAt = start + i;
+            // Share one envelope between both notes, so coherent periods do not
+            // sum at full strength. Retain the original short fade for CV
+            // transitions; samples beyond the fade remain exactly as recorded.
+            destination[outputAt] = destination[outputAt] * (1 - weight) +
+                samples[i] * (complementary ? weight : 1);
         }
         for (var i = overlap; i < samples.Length; i++) destination.Add(samples[i]);
         return start;

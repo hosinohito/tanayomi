@@ -41,7 +41,10 @@ public interface IUtauDirectDiagnostics
     event Action<UtauTimingPlanException>? TimingFallback;
 }
 
-public sealed record UtauReadingUnit(string? Alias, int Extensions, char Pause);
+public sealed record UtauReadingUnit(string? Alias, int Extensions, char Pause)
+{
+    internal bool LexicalHigh { get; init; }
+}
 
 /// <summary>Optional per-utterance planning. The renderer retains ownership of
 /// source timing limits; a rejected plan falls back to ordinary synthesis.</summary>
