@@ -13,18 +13,20 @@ internal sealed class DesktopUtauModes : IUtauPcmPostprocessor, IUtauModeProvide
     {
         InitializationErrors = Array.AsReadOnly((initializationErrors ?? []).Take(8).ToArray());
         var choices = new List<UtauModeChoice>();
+        Add(UtauSynthesisMode.Simple, "シンプル（波形接続）", null);
+        if (neuralAvailable && prosodyAvailable)
+            Add(UtauSynthesisMode.OpenVoice, "NIT日本語＋OpenVoice", new DesktopNeuralUtau(neuralReferenceRoot));
         Add(UtauSynthesisMode.Context,
             worldAvailable ? prosodyAvailable ? "時間・抑揚（現行）" : "一定音程（WORLD）" : "従来方式",
             worldAvailable ? prosodyAvailable ? new DesktopUtauProsody() : new DesktopWorldPostprocessor(WorldReference.CreateAsync) : null);
-        Add(UtauSynthesisMode.Simple, "シンプル（波形接続）", null);
         if (prosodyAvailable) Add(UtauSynthesisMode.Timing, "時間予測のみ（WORLDなし）", new DesktopUtauProsody(timingOnly: true));
         if (worldAvailable) Add(UtauSynthesisMode.Flat, "一定音程（WORLD）", new DesktopWorldPostprocessor(WorldReference.CreateAsync));
         if (worldAvailable && prosodyAvailable)
             Add(UtauSynthesisMode.FastContext, "時間・抑揚（DIO解析）", new DesktopUtauProsody(fastAnalysis: true));
         if (prosodyAvailable)
         {
-            Add(UtauSynthesisMode.Psola, "TD-PSOLA（試験）", new DesktopUtauProsody(waveform: WaveformPitchMethod.Psola));
-            Add(UtauSynthesisMode.PhaseVocoder, "位相ボコーダー（試験）", new DesktopUtauProsody(waveform: WaveformPitchMethod.PhaseVocoder));
+            Add(UtauSynthesisMode.Psola, "TD-PSOLA", new DesktopUtauProsody(waveform: WaveformPitchMethod.Psola));
+            Add(UtauSynthesisMode.PhaseVocoder, "位相ボコーダー", new DesktopUtauProsody(waveform: WaveformPitchMethod.PhaseVocoder));
         }
         if (prosodyAvailable)
         {
@@ -35,13 +37,12 @@ internal sealed class DesktopUtauModes : IUtauPcmPostprocessor, IUtauModeProvide
             Add(UtauSynthesisMode.DirectPsola, "原音直接・周期同期", direct);
         }
         else Add(UtauSynthesisMode.DirectPsola, "原音直接・周期同期（一定音程）", new UtauDirectPsola());
-        if (neuralAvailable && prosodyAvailable)
-            Add(UtauSynthesisMode.OpenVoice, "NIT日本語＋OpenVoice", new DesktopNeuralUtau(neuralReferenceRoot));
         Modes = Array.AsReadOnly(choices.ToArray());
 
         void Add(UtauSynthesisMode mode, string label, IUtauPcmPostprocessor? processor)
         {
-            processors.Add(mode, processor); choices.Add(new(mode, label));
+            processors.Add(mode, processor);
+            choices.Add(new(mode, mode is UtauSynthesisMode.Simple or UtauSynthesisMode.OpenVoice ? label : label + "（実験）"));
             if (processor is not null) owned.Add(processor);
         }
     }

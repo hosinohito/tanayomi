@@ -201,8 +201,8 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         }
     }
     public IReadOnlyList<UtauModeChoice> Modes => postprocessor is IUtauModeProvider provider ? provider.Modes :
-        [new(UtauSynthesisMode.Context, "従来方式"), new(UtauSynthesisMode.Simple, "シンプル（波形接続）"),
-            new(UtauSynthesisMode.DirectPsola, "原音直接・周期同期（一定音程）")];
+        [new(UtauSynthesisMode.Simple, "シンプル（波形接続）"), new(UtauSynthesisMode.Context, "従来方式（実験）"),
+            new(UtauSynthesisMode.DirectPsola, "原音直接・周期同期（一定音程）（実験）")];
     private IUtauPcmPostprocessor? Processor(UtauSynthesisMode selected) => selected == UtauSynthesisMode.Simple ? null :
         postprocessor is IUtauModeProvider provider ? provider.Resolve(selected) :
         selected == UtauSynthesisMode.DirectPsola ? portableDirect ??= new() : postprocessor;

@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Text.Json;
@@ -16,6 +16,12 @@ internal static class Program
     {
         try
         {
+            if (args.Length == 1 && args[0] == "--utau-mode-menu-check")
+            {
+                UtauModeMenuTests.RunAsync(Check).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} UTAU mode menu checks");
+                return 0;
+            }
             if (args.Length is 1 or 2 && args[0] == "--utau-lead-handoff-check")
             {
                 UtauLeadHandoffTests.RunAsync(Check, args.Length == 2 ? args[1] : null).GetAwaiter().GetResult();
@@ -227,6 +233,7 @@ internal static class Program
         await DesktopSpeechTests.RunAsync(Check);
         await DesktopPcmOutputTests.RunAsync(Check);
         await UtauTests.RunAsync(Check);
+        await UtauModeMenuTests.RunAsync(Check);
         await UtauSimplePrefetchTests.RunAsync(Check);
         await UtauVoicedJoinTests.RunAsync(Check);
         await UtauContinuousPitchTests.RunAsync(Check);
