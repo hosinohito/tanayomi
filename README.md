@@ -2,6 +2,20 @@
 
 Twitch／YouTubeのチャットを日本語のOS標準音声、UTAU音源、同梱の日本語音声で読み上げるアプリ。Windows・macOS・Linux・Android・iOSを対象とする。
 
+## Windows版の音声機能
+
+| 方式 | 実装・構成の入口 |
+| --- | --- |
+| VOICEVOX（アプリ内蔵） | [音声一覧](src/Tanayomi.Desktop/VoicevoxCatalog.cs)、[合成ワーカー](src/Tanayomi.Desktop/VoicevoxPcmWorker.cs)、[資産準備](native/prepare-voicevox.ps1) |
+| Supertonic 3 | [音声出力](src/Tanayomi.Desktop/SupertonicSpeech.cs)、[資産準備](native/prepare-supertonic.ps1) |
+| Aivis系の同梱音声 | [音声出力](src/Tanayomi.Desktop/AivisSpeech.cs)、[資産準備](native/aivis/package.py) |
+| NIT日本語・東北大f01・Mei・Takumi | [Open JTalkワーカー](src/Tanayomi.Desktop/OpenJtalkPcmWorker.cs) |
+| UTAU・NIT日本語＋OpenVoice | [UTAU合成](src/Tanayomi/UtauSpeech.cs)、[OpenVoice変換](src/Tanayomi.Desktop/Neural/DesktopNeuralUtau.cs) |
+
+音声を発言ごとに選ぶランダム設定、0〜400%の音量調整、OpenVoice専用の「間延びモード」に対応する。操作と保存仕様は[SPEC.md](SPEC.md)を参照する。
+
+**GitHubのソースZIPと、音声資産を準備済みのWindowsアプリ一式は内容が異なる。** Git管理対象はソース・試験・文書・許諾付きの同梱原本で、追加取得するエンジンDLL・モデルや生成物を置く`.local/`は含めない。クローンしただけで`publish`しても、準備していない方式は含まれず、起動時の音声選択肢にも表示されない。各資産の準備手順は[Open JTalkの固定入力](#open-jtalkの固定入力)以降、許諾条件は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照する。実行物の参照先は[CURRENT_TASK.md](CURRENT_TASK.md)に記載する。
+
 ## 起動と利用操作
 
 Windows版はアプリ一式の`Tanayomi.Desktop.exe`を直接起動する。利用時に.NET SDKや起動用コマンドは不要。接続、音源選択、保存データの扱いは[SPEC.md](SPEC.md)を参照する。開発中の最新の起動パスは[CURRENT_TASK.md](CURRENT_TASK.md)に記載する。
@@ -20,7 +34,7 @@ UTAUは同梱のNAIST-JDIC派生辞書とC#の読み変換、日本語原音の�
 | `src/Tanayomi.Android/`・`src/Tanayomi.iOS/` | 各OSの起動部・バックグラウンド動作・標準音声・PCM出力 |
 | `tests/Tanayomi.Tests/` | 正常系・異常系の試験と画面描画 |
 | `assets/` | 同梱音源、派生辞書、変換スクリプト、許諾文 |
-| `native/` | WORLD比較用C ABIブリッジと固定版ビルドスクリプト |
+| `native/` | WORLD・Open JTalk・OpenVoiceのブリッジ／ビルドと、VOICEVOX・Supertonic・Aivis等の資産準備 |
 | `.local/` | 開発環境、キャッシュ、一時生成物 |
 | `.local/build/` | ビルド・中間・publish出力 |
 | `.local/tryout/<日時>-<短ID>/` | 新規作成する各自己完結型コピーと、それぞれの`data/` |
@@ -134,7 +148,7 @@ python assets/build-reading-dictionary.py
 
 ## Open JTalkの固定入力
 
-再利用する公式入力は`.local/vendor/open-jtalk/`の`open_jtalk-1.11.tar.gz`、`open_jtalk_dic_utf_8-1.11.tar.gz`、`hts_engine_API-1.10.tar.gz`、`hts_voice_nitech_jp_atr503_m001-1.05.tar.gz`。取得元・固定サイズ・SHA-256・条件は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#追加音源の条件調査詳細)から辿れる。作業場所はリポジトリ直下で、既存入力の照合は`Get-FileHash .local/vendor/open-jtalk/*.tar.gz -Algorithm SHA256`で行う。アーカイブは取得入力として保持し、まだ実行物や製品へ同梱したものではない。再取得では対象の公式リンクを使い、既存ファイルを上書きせずhashを照合する。
+再利用する公式入力は`.local/vendor/open-jtalk/`の`open_jtalk-1.11.tar.gz`、`open_jtalk_dic_utf_8-1.11.tar.gz`、`hts_engine_API-1.10.tar.gz`、`hts_voice_nitech_jp_atr503_m001-1.05.tar.gz`。取得元・固定サイズ・SHA-256・条件は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md#追加音源の条件調査詳細)から辿れる。作業場所はリポジトリ直下で、既存入力の照合は`Get-FileHash .local/vendor/open-jtalk/*.tar.gz -Algorithm SHA256`で行う。アーカイブ自体は開発用の取得入力として保持する。アプリ一式には、準備したDLL・辞書・モデルをresourcesへ別途配置する。再取得では対象の公式リンクを使い、既存ファイルを上書きせずhashを照合する。
 
 辞書binaryは展開すると約107.3MB（`sys.dic`だけで約103.1MB）、モデル本体は約1.17MB。製品へ含める場合は辞書も配布サイズに加わり、モデルだけでは動かない。既存のUTAU用読み辞書は情報・形式が異なり、そのまま代用しない。
 

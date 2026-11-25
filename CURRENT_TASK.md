@@ -1,14 +1,13 @@
 # 現在の作業
 
-更新日時：2026-11-23 18:43:41 +09:00。引き継ぎID：20261123-06。
+更新日時：2026-11-25 15:03:35 +09:00。引き継ぎID：20261125-01。
 依頼一覧・優先順はPROJECT_STATUS.md。R26はユーザーの明示終了まで未完。Windows以外と公開配布は保留。
 
 ## 現在の目的・到達点
 
-最新依頼：NIT＋OpenVoiceの『間延びモード』を追加し、完了後 https://github.com/hosinohito/tanayomi.git にソース/文書をpush。UI/core/nativeの実装・共通2679/native40/製品79+plan6成功。既定OFF修正版、ON修正前の長さ、次発言snapshot・保存復元・切替cache破棄。他方式/標準NIT不変。追加native export toj_synthesize_drawn_out、採用audit183016-4b48d01c、DLL 200C9249E57DF9BEF944E59B083054C667A96629AA8586300B04F025B3192FD7。
+最新依頼：GitHubが古くVOICEVOXがないように見えるため、利用者指定の .local/tryout/20261123-183929-66ba7f を基準に最新版をpushする。main/remote HEADは28354ecdde795fc69b0ec16a7553f4d7d81fcbb4で一致、fetch後のソース差分と未追跡差分なし。remote treeにVoicevoxCatalog/VoicevoxPcmWorker/prepare-voicevoxを確認。指定版のDesktop/core DLLは開発publishとSHA一致、VOICEVOX/Aivis/Supertonicの資産manifestも実在する。
 
-次操作：今回の機能実装/検証/新copy/GitHub初回pushは完了。mainの初回commit cab389e0a9a21da2ba15f2a5e824c6d4d87c17f0をoriginへ反映済み。この完了記録を追記commit/pushして整合を確認する。新しい機能の次作業は未指示。R26は既存の根拠確認条件で未完。remote既存refsなしを確認済み。Git初期化とlocal credential.helper manager/credentialStore wincredmanのみ設定し、global safe.directoryは変更しない。Gitは利用者所有のため非管理者の正式利用者権限を使う。tokenはregister-github-token.ps1の非表示stdin→Windows資格情報、秘密表示/ファイル保存なし。利用者は登録済みと回答。GitHub CLIは未導入で不使用。PowerShell7はC:/Users/hoshi/.cache/codex-runtimes/codex-primary-runtime/dependencies/native/powershell/pwsh.exeを使用可。
-
+対応：READMEの冒頭に各同梱方式と実装/準備scriptリンクを追加。GitHubのソースZIPには追加取得する.localのDLL/モデルを含まず、資産未準備のbuildでは選択肢が出ないことを明記。古い『まだ同梱していない』と読める原典archive説明も現況へ修正。製品ソース・exeの変更なし、再build/再試験は不要。README相対リンクと指定版DLL照合成功。今回の文書差分をmainへpushし、remote一致を確認する。実行物の公開配布/本体ライセンス決定は別途保留。
 容量：完了ORT col2im/fusedの再生成可能LIB/OBJ252個1,400,306,855bytesを検査後清掃。最初のpublish resources抑制は効かず容量不足、失敗したbin/resourcesのみ安全清掃してcsprojの明示metadataへ修正。再publish成功、通常buildコピー維持。旧141155版削除の個別承認ありだが、実行時に指定フォルダーが既に消えており削除せず。空き約28GBへ変化したことを観測。181159版/dataを保護して新183929版の作成・照合完了。
 前提：通常モードの長文修正は利用者が『治った』と確認済み。今回ONはその修正前を意図して選ぶ機能。品質比較の詳細はRESEARCH、履歴はWORK_LOG。
 
