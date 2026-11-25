@@ -1806,3 +1806,12 @@
 - 製品ソースの未pushは確認されなかった。GitHub clone単体には.local配下の追加DLL/モデルがなく、HasPackage/HasAssetsとcsprojのExists条件で方式が表示されない経路を確認。ただし利用者が実際にどの手順で古いと判断したかは未確認で、原因を断定しない。
 - README冒頭へ対応音声一覧と実装/資産準備のリンクを追加し、ソースZIPと準備済みアプリ一式の違いを説明。nativeフォルダー説明とOpen JTalk archiveの古い記述を訂正。新規リンク全件実在を確認。文書のみなので再build/試験/試用copyは作らず、既存版/dataを変更しない。文書差分を承認されたmainへpushしremote一致を確認する。
 <!-- WORK_LOG_ENTRY_END -->
+
+<!-- WORK_LOG_ENTRY -->
+## 20261125-02 — 2026-11-25 15:13:01 +09:00
+
+- 目的：開発環境の準備手順を適切な文書へ記載しGitHubへpushする。READMEを正本として初回Windows環境、固定SDKの配置、PowerShell 5.1との区別、cloneと保存先、locked restoreの入口を追加。
+- dev.ps1/global.json/csproj/nativeスクリプトと照合。追加音声がOpen JTalkに依存すること、Python venvとLLVM/CRTの準備順、MSVC/SDK固定版、手動原本配置と監査済みSkiaがない場合の構成差を明記。独立した読取監査はGPT-6.1-solに委任し結果を統合。Microsoft公式のPowerShell/SDK導入資料も参照。
+- 検証：README全相対リンクの実在とPowerShellコードブロックの構文解析に成功。既存実装との静的照合であり、新規環境での全再構築は行っていない。文書のみのため製品再build/再試験/試用copyは不要。環境インストール、既存版/data変更、一時物作成なし。
+- 文書差分を指定mainへcommit/pushしremote一致を確認する。今回依頼は反映照合で完了。R26は具体的な次候補未確定、他OS/公開実行物の保留を維持。
+<!-- WORK_LOG_ENTRY_END -->

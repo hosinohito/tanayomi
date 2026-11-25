@@ -1,13 +1,13 @@
 # 現在の作業
 
-更新日時：2026-11-25 15:03:35 +09:00。引き継ぎID：20261125-01。
+更新日時：2026-11-25 15:13:01 +09:00。引き継ぎID：20261125-02。
 依頼一覧・優先順はPROJECT_STATUS.md。R26はユーザーの明示終了まで未完。Windows以外と公開配布は保留。
 
 ## 現在の目的・到達点
 
-最新依頼：GitHubが古くVOICEVOXがないように見えるため、利用者指定の .local/tryout/20261123-183929-66ba7f を基準に最新版をpushする。main/remote HEADは28354ecdde795fc69b0ec16a7553f4d7d81fcbb4で一致、fetch後のソース差分と未追跡差分なし。remote treeにVoicevoxCatalog/VoicevoxPcmWorker/prepare-voicevoxを確認。指定版のDesktop/core DLLは開発publishとSHA一致、VOICEVOX/Aivis/Supertonicの資産manifestも実在する。
-
-対応：READMEの冒頭に各同梱方式と実装/準備scriptリンクを追加。GitHubのソースZIPには追加取得する.localのDLL/モデルを含まず、資産未準備のbuildでは選択肢が出ないことを明記。古い『まだ同梱していない』と読める原典archive説明も現況へ修正。製品ソース・exeの変更なし、再build/再試験は不要。README相対リンクと指定版DLL照合成功。今回の文書差分をmainへpushし、remote一致を確認する。実行物の公開配布/本体ライセンス決定は別途保留。
+最新依頼：開発環境の準備手順を適切な文書へ記載してpushする。
+対応：READMEへWindows初回準備（Git/PowerShell 7.4以上/固定.NET SDK/保存先/locked restore）と全音声の準備順、Python/C++前提、手動工程・監査済みSkiaの違いを追記。実スクリプト・csprojと照合し、全相対リンク実在・PowerShellコードブロック構文を確認。新規環境の全再構築は今回未実施。製品コード・既存環境・試用版/dataは変更していない。
+次操作：文書4件をcommitしてorigin/mainへpushし、remote SHAと一致を確認する。前回のpushは9b9b03fで確認済み。公開実行物・本体ライセンスは引き続き保留。今回の文書依頼はpush照合をもって完了。
 容量：完了ORT col2im/fusedの再生成可能LIB/OBJ252個1,400,306,855bytesを検査後清掃。最初のpublish resources抑制は効かず容量不足、失敗したbin/resourcesのみ安全清掃してcsprojの明示metadataへ修正。再publish成功、通常buildコピー維持。旧141155版削除の個別承認ありだが、実行時に指定フォルダーが既に消えており削除せず。空き約28GBへ変化したことを観測。181159版/dataを保護して新183929版の作成・照合完了。
 前提：通常モードの長文修正は利用者が『治った』と確認済み。今回ONはその修正前を意図して選ぶ機能。品質比較の詳細はRESEARCH、履歴はWORK_LOG。
 
