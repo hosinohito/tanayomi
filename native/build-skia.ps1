@@ -2,6 +2,7 @@
 param(
     [ValidateSet('Plan','Acquire','Prepare','Compile','Audit')][string]$Action='Plan',
     [string]$WorkRoot='', [string]$OutputDirectory='', [string]$PythonExecutable='',
+    [string]$VisualStudioDirectory='', [string]$WindowsSdkDirectory='', [string]$NinjaExecutable='',
     [ValidateRange(1,2)][int]$Parallel=2,
     [ValidateRange(1,600)][int]$BuildDeadlineSeconds=600,
     [switch]$Resume
@@ -13,9 +14,11 @@ $work=if([string]::IsNullOrWhiteSpace($WorkRoot)){Join-Path $workspace '.local/s
 $output=if([string]::IsNullOrWhiteSpace($OutputDirectory)){Join-Path $workspace '.local/build/skia-rebuild/win-x64-md'}else{[IO.Path]::GetFullPath($OutputDirectory)}
 $source=Join-Path $work 'source/skia';$audit=Join-Path $work 'audit'
 $python=if([string]::IsNullOrWhiteSpace($PythonExecutable)){Join-Path $workspace '.local/neural-openvoice/venv/Scripts/python.exe'}else{[IO.Path]::GetFullPath($PythonExecutable)}
-$vc='C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC'
-$sdk='C:/Program Files (x86)/Windows Kits/10'
-$ninja='C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe'
+$visualStudio=if([string]::IsNullOrWhiteSpace($VisualStudioDirectory)){'C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools'}else{[IO.Path]::GetFullPath($VisualStudioDirectory).Replace('\','/')}
+$vc=Join-Path $visualStudio 'VC'
+$sdk=if([string]::IsNullOrWhiteSpace($WindowsSdkDirectory)){'C:/Program Files (x86)/Windows Kits/10'}else{[IO.Path]::GetFullPath($WindowsSdkDirectory).Replace('\','/')}
+$ninja=if([string]::IsNullOrWhiteSpace($NinjaExecutable)){Join-Path $visualStudio 'Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe'}else{[IO.Path]::GetFullPath($NinjaExecutable)}
+$vc=$vc.Replace('\','/');$sdk=$sdk.Replace('\','/')
 $gn=Join-Path $work 'tools/gn.exe'
 $dumpbin=Join-Path $vc 'Tools/MSVC/14.29.30037/bin/Hostx64/x64/dumpbin.exe'
 function Assert-SkiaPath([string]$Path,[string]$Boundary){
@@ -67,9 +70,7 @@ extra_ldflags=[ "/DEBUG:FULL", "/DEBUGTYPE:CV,FIXUP", "/guard:cf", "/DELAYLOAD:d
 function Get-SkiaVsEnvironment {
     param([Parameter(Mandatory)][IDisposable]$ErrorModeGuard)
     if(-not [OperatingSystem]::IsWindows() -or $null -eq $ErrorModeGuard){throw 'A live Windows native error-mode guard is required.'}
-    $visualStudio='C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools'
-    $vc=Join-Path $visualStudio 'VC\Tools\MSVC\14.29.30037'
-    $sdk='C:\Program Files (x86)\Windows Kits\10'
+    $vc=Join-Path $script:vc 'Tools/MSVC/14.29.30037'
     $sdkVersion='10.0.19041.0'
     $compilerBin=Join-Path $vc 'bin\Hostx64\x64'
     $sdkBin=Join-Path $sdk ('bin\'+$sdkVersion+'\x64')
@@ -191,7 +192,7 @@ function Write-SkiaNotices {
     $licenseInputs|ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $audit 'formal-license-inputs.json') -Encoding utf8
 }
 if($Action-eq 'Plan'){
-    [pscustomobject]@{WorkRoot=$work;Source=$source;Output=$output;Python=$python;Target='SkiaSharp';Runtime='/MD';Dng=$false;Piex=$false;Parallel=$Parallel;BuildDeadlineSeconds=$BuildDeadlineSeconds;
+    [pscustomobject]@{WorkRoot=$work;Source=$source;Output=$output;Python=$python;VisualStudio=$visualStudio;WindowsSdk=$sdk;Ninja=$ninja;Target='SkiaSharp';Runtime='/MD';Dng=$false;Piex=$false;Parallel=$Parallel;BuildDeadlineSeconds=$BuildDeadlineSeconds;
         Acquisition='native/build-skia.ps1 -Action Acquire';TransferLimitBytes=600MB;ExpandedLimitBytes=2GB;CompilationStarted=$false}|
         ConvertTo-Json -Depth 4
     exit 0

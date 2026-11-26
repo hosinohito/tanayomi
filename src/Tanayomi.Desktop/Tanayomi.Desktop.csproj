@@ -15,7 +15,7 @@
     <MmdagentVoiceDirectory>$(MSBuildThisFileDirectory)../../.local/vendor/mmdagent/1.8</MmdagentVoiceDirectory>
     <VoicevoxDirectory>$(MSBuildThisFileDirectory)../../.local/vendor/voicevox/package</VoicevoxDirectory>
     <SupertonicDirectory>$(MSBuildThisFileDirectory)../../.local/vendor/supertonic/prepared-md-vc143</SupertonicDirectory>
-    <AivisDirectory Condition="'$(AivisDirectory)' == ''">$(MSBuildThisFileDirectory)../../.local/vendor/aivis/package-4a8ce577e6f5417b9d9e90a508e0f8c2</AivisDirectory>
+    <AivisDirectory Condition="'$(AivisDirectory)' == ''">$(MSBuildThisFileDirectory)../../.local/vendor/aivis/package</AivisDirectory>
     <OpenJtalkNativeEnabled Condition="'$(WorldComparison)' != 'true' and ('$(RuntimeIdentifier)' == 'win-x64' or ('$(RuntimeIdentifier)' == '' and '$(OS)' == 'Windows_NT')) and Exists('$(OpenJtalkNativeDirectory)/tanayomi-open-jtalk.dll')">true</OpenJtalkNativeEnabled>
     <DefineConstants Condition="'$(OpenJtalkNativeEnabled)' == 'true'">$(DefineConstants);OPEN_JTALK_NATIVE</DefineConstants>
     <OpenVoiceNativeDirectory Condition="'$(OpenVoiceNativeDirectory)' == ''">$(MSBuildThisFileDirectory)../../.local/build/native-openvoice</OpenVoiceNativeDirectory>

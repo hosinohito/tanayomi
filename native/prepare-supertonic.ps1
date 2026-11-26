@@ -51,17 +51,25 @@ $inputs = @(
     }
 )
 
-function Get-FixedInput([string]$Directory, [string]$Name, [string]$Url, [string]$Hash) {
+function Get-FixedInput([string]$Directory, [string]$Name, [string]$Url, [string]$Hash, [string]$BundledInput = '') {
     $inputPath = Join-Path $Directory $Name
     Confirm-LocalPath $inputPath
     if (-not (Test-Path -LiteralPath $inputPath -PathType Leaf)) {
-        if (-not $Download) { throw "Missing fixed Supertonic input $Name." }
-        $pending = Join-Path $stage $Name
-        Invoke-WebRequest -Uri $Url -OutFile $pending -TimeoutSec 180 -UseBasicParsing
-        if ((Get-FileHash -LiteralPath $pending -Algorithm SHA256).Hash -ne $Hash) {
-            throw "Supertonic input digest mismatch: $Name."
+        if ($BundledInput) {
+            Confirm-LocalPath $BundledInput
+            if ((Get-FileHash -LiteralPath $BundledInput -Algorithm SHA256).Hash -ne $Hash) {
+                throw "Bundled Supertonic input digest mismatch: $Name."
+            }
+            [IO.File]::Copy($BundledInput, $inputPath)
+        } else {
+            if (-not $Download) { throw "Missing fixed Supertonic input $Name." }
+            $pending = Join-Path $stage $Name
+            Invoke-WebRequest -Uri $Url -OutFile $pending -TimeoutSec 180 -UseBasicParsing
+            if ((Get-FileHash -LiteralPath $pending -Algorithm SHA256).Hash -ne $Hash) {
+                throw "Supertonic input digest mismatch: $Name."
+            }
+            [IO.File]::Move($pending, $inputPath)
         }
-        [IO.File]::Move($pending, $inputPath)
     }
     if ((Get-FileHash -LiteralPath $inputPath -Algorithm SHA256).Hash -ne $Hash) {
         throw "Supertonic input digest mismatch: $Name."
@@ -199,7 +207,14 @@ for path in sorted(p for p in out.iterdir() if p.is_file()):
         @('hclust-cpp.txt', ($raw + 'csukuangfj/hclust-cpp/2026-02-25/LICENSE'), 'E361D842DA1D290351860AD6DCCE2673A1E42E4F873A3AE1FF4EB92C6ADAA882')
     )
     foreach ($entry in $licenseFiles) {
-        $source = Get-FixedInput $notices $entry[0] $entry[1] $entry[2]
+        $bundledInput = ''
+        if ($entry[0] -eq 'onnxruntime-LICENSE.txt') {
+            # Preserve the audited bytes even when the upstream fixed tag is unavailable.
+            $bundledInput = Join-Path $root 'assets/supertonic-ort-LICENSE.txt'
+        } elseif ($entry[0] -eq 'onnxruntime-ThirdPartyNotices.txt') {
+            $bundledInput = Join-Path $root 'assets/supertonic-ort-NOTICES.txt'
+        }
+        $source = Get-FixedInput $notices $entry[0] $entry[1] $entry[2] $bundledInput
         if ($entry[0] -eq 'darts.h') {
             $header = [IO.File]::ReadAllText($source)
             $end = $header.IndexOf('*/', [StringComparison]::Ordinal)

@@ -95,13 +95,32 @@ UTAUは同梱のNAIST-JDIC派生辞書とC#の読み変換、日本語原音の�
 
 Pythonは利用者側の必須環境ではない。上記TEMP設定をしたシェルで、用意したPython 3.12.14の実体から`& 'Python本体の絶対パス' -m venv .local/neural-openvoice/venv`を実行する。以後は`.local/neural-openvoice/venv/Scripts/python.exe`を使う。OpenVoice変換の固定依存導入コマンドは後述の`openvoice-export-requirements.txt`の説明を参照する。Aivisの製品用Python／wheelは別の固定入力であり、このvenvをそのまま製品へコピーしない。
 
-Skia／OpenVoiceのC++再構築には、スクリプトが固定するMSVC 14.29.30037（compiler 19.29.30038.1）、Windows SDK 10.0.19041.0、Ninja、OpenVoiceではCMake 3.31.6が必要。SkiaスクリプトはVS 2019 Build Toolsの既定パスを参照する。Visual Studio最新版を入れただけで同じ成果物になるとは限らず、別ツールチェーンへの変更には再監査が必要。ビルドツールと再配布物の条件はTHIRD_PARTY_NOTICESを確認する。
+Skia／OpenVoiceのC++再構築には、スクリプトが固定するMSVC 14.29.30037（compiler 19.29.30038.1）、Windows SDK 10.0.19041.0、Ninja、OpenVoiceではCMake 3.31.6が必要。Skiaスクリプトは既定でVS 2019 Build Toolsを参照し、別配置は引数で指定できる。Visual Studio最新版を入れただけで同じ成果物になるとは限らず、別ツールチェーンへの変更には再監査が必要。ビルドツールと再配布物の条件はTHIRD_PARTY_NOTICESを確認する。
 
 これは全音声の自動bootstrapではない。Open JTalk原典、Aivis固定原本／wheel、ORTソース、監査済みDLLの採用配置などに手動工程が残る。Skiaのmanifestがない通常ビルドではNuGet由来のnativeを使用するため、監査済みアプリと同一の配布構成とは扱わない。DLL・manifestだけを別版へ差し替えたり、ハッシュ検査を無効にして合わせたりしない。
 
 準備後は`./dev.ps1 test -Configuration Release`、`./dev.ps1 publish`、[合成方式の製品確認](#合成方式の製品確認)と固定入力節の対象製品試験を実施する。完成先は`.local/build/app/Tanayomi.Desktop.exe`。`resources/`の対象音声資産と画面の選択肢も確認する。検証済み出力の利用者用コピーは`./dev.ps1 tryout -UseExistingPublish`で新規作成できる。資産を変更した後に古いpublishを再利用しない。
 
 ### ビルド・実行・試験
+
+#### 別マシンで資産の場所を指定する
+
+`CURRENT_TASK.md`や過去ログの`audit-日時-ID`／`package-ID`は開発時の実在成果物を指す記録で、取得元ではない。別マシンでは上の手順で生成した成果物を使う。GitHubにこれらのローカルフォルダーは含まれない。
+
+WORLD／Open JTalk／OpenVoiceの既定入力先は、それぞれリポジトリ内`.local/build/native-world`／`native-open-jtalk`／`native-openvoice`。別配置を使う場合は同じPowerShellで`$env:WorldNativeDirectory`／`$env:OpenJtalkNativeDirectory`／`$env:OpenVoiceNativeDirectory`へ実在する絶対パスを設定してから`dev.ps1`を実行する。音声原本と許諾・manifestを一式揃える。アプリの利用者データ`data/`をビルド入力に流用しない。
+
+Aivisの既定入力先は`.local/vendor/aivis/package/`。準備スクリプトは安全のため毎回別の`package-<ID>/`を生成するので、出力された**自分のマシンの完成先**を以下へ指定する。以前の開発機固有のIDを指定する必要はない。
+
+```powershell
+# <ID>はprepare-aivis.ps1が実際に出力した名前に置き換える。
+$env:AivisDirectory = (Resolve-Path '.local/vendor/aivis/package-<ID>').Path
+if (-not (Test-Path (Join-Path $env:AivisDirectory 'voices.json'))) {
+    throw '完成したAivis packageではありません。'
+}
+./dev.ps1 publish
+```
+
+環境変数は現在のシェル限り。次のシェルでも同じ完成先を指定する。未準備の音声が消える場合は、選択した資産の不足とOpen JTalkの有効条件を先に確認する。固定ハッシュの不一致はパス指定だけでは解決しないため、対象バージョンと原本を照合する。
 
 SDK版は`global.json`、依存パッケージ版はプロジェクト定義と`packages.lock.json`で固定する。リポジトリ直下からPowerShell 7以降で[dev.ps1](dev.ps1)を使用する。
 
@@ -230,7 +249,7 @@ VOICEVOXの内蔵Windows CPU構成は `./native/prepare-voicevox.ps1` で固定C
 
 Supertonic 3はリポジトリ直下で `./native/prepare-supertonic.ps1 -Download` により固定sherpa-onnx 2.0.1・INT8モデル・許諾・対応ソースを準備する。開発用Pythonは既定の `.local/neural-openvoice/venv/Scripts/python.exe`、PE検査は `.local/vendor/llvm-mingw/llvm-mingw-20261020-msvcrt-x86_64/bin/llvm-readobj.exe`、VC Runtimeは上記VOICEVOXの準備済み資産を使う。必要なら `-Python`・`-ReadObj`・`-CrtDirectory` でリポジトリ内の実体を指定する。取得済み入力で再検査する場合は `-Download` を外す。出力 `.local/vendor/supertonic/prepared-md-vc143/` のモデル・DLL・licensesだけを通常Windowsビルドで `resources/supertonic/` へ配置する。
 
-AivisSpeechのWindows CPUパッケージは `./native/prepare-aivis.ps1 -BuildPython .local/neural-openvoice/venv/Scripts/python.exe` で準備する。固定原本とwheelを `.local/vendor/aivis/` に用意し、`native/aivis/wheels.json`・`native/aivis/voices.json`・スクリプト内のSHAと照合する。入力一覧・取得元は同スクリプトとlockを参照。完成先は毎回固有の `.local/vendor/aivis/package-<ID>/`。再生成した場合はそのシェルで `$env:AivisDirectory = 'C:/work/tanayomi/.local/vendor/aivis/package-<ID>'` を設定して `./dev.ps1 publish` または `tryout` を実行する。Python・前処理ソース・BERT・音声・許諾・対応ソースを `resources/aivis/` へ配置する。開発側のarchive-auditは配布対象外。使用する上流処理との差分は同梱NOTICEに記載する。利用者側のPython・エンジン導入は不要。
+AivisSpeechのWindows CPUパッケージは `./native/prepare-aivis.ps1 -BuildPython .local/neural-openvoice/venv/Scripts/python.exe` で準備する。固定原本とwheelを `.local/vendor/aivis/` に用意し、`native/aivis/wheels.json`・`native/aivis/voices.json`・スクリプト内のSHAと照合する。入力一覧・取得元は同スクリプトとlockを参照。完成先は毎回固有の `.local/vendor/aivis/package-<ID>/`。再生成した場合はそのシェルで `$env:AivisDirectory = (Resolve-Path '.local/vendor/aivis/package-<ID>').Path` を設定して `./dev.ps1 publish` または `tryout` を実行する。Python・前処理ソース・BERT・音声・許諾・対応ソースを `resources/aivis/` へ配置する。開発側のarchive-auditは配布対象外。使用する上流処理との差分は同梱NOTICEに記載する。利用者側のPython・エンジン導入は不要。
 
 組立後のAivis検証は、リポジトリ直下でTEMP/TMPを`.local/tmp/`へ設定し、`native/process-error-mode.ps1`のエラーモードを継承した非表示プロセスで `.local/neural-openvoice/venv/Scripts/python.exe -B native/aivis/verify_worker.py <完成packageの絶対パス>` を実行する。同梱PythonによるPCM量子化の境界/最大長/不正値、過大要求の拒否、全8音声×2文を確認し、音声を再生・保存せず一時領域を清掃する。
 
@@ -261,6 +280,58 @@ OpenVoiceだけを検証する場合は同じコマンドへ`-NeuralOnly`を指�
 Windows x64で同梱するOpenVoice資産の入力先は`.local/build/native-openvoice/`（MSBuildの`OpenVoiceNativeDirectory`で変更可能）。監査した`reference.onnx`、`converter.onnx`、`onnxruntime.dll`、VC142の3 DLL、portableな`openvoice-build.json`、許諾文・Eigen対象ソースZIPを揃える。具体的な固定版・hash・必要表示は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照する。通常build／publishはモデルと実行物を`resources/openvoice/`、許諾・対象ソースを`licenses/openvoice/`へ明示コピーする。Windows以外の出力へこれらのDLLをコピーしない。
 
 モデルの再変換は開発専用Python 3.12.14のvenvを`.local/neural-openvoice/venv/`へ用意し、シェルのTEMP/TMP/TMPDIRを存在する`.local/tmp/`の絶対パスへ設定して行う。固定依存は[native/openvoice-export-requirements.txt](native/openvoice-export-requirements.txt)。そのvenvのPythonで`-m pip install --no-deps --require-hashes --cache-dir .local/neural-openvoice/pip-cache -r native/openvoice-export-requirements.txt`を実行する。PyTorch等は変換専用で、製品へコピーしない。[export_openvoice.py](src/Tanayomi.Desktop/Neural/export_openvoice.py)へ`--root .local/neural-openvoice --prepare-inputs`を渡すと固定source・重みの不足分だけを取得・hash照合する。同じコマンドから`--prepare-inputs`を外すと新規`onnx/`へ2graphと許諾・manifestを出力する。既存出力・不一致入力を上書きしない。
+
+### 取得に失敗した場合の固定入力
+
+**Supertonic**：ONNX Runtimeの固定許諾2件のURLが404になるため、検証済み原本を[LICENSE](assets/supertonic-ort-LICENSE.txt)と[第三者表示](assets/supertonic-ort-NOTICES.txt)としてソースへ同梱する。`prepare-supertonic.ps1`は不足時に補完し、従来のSHAを検査する。既存の破損入力は上書きせず停止する。他の入力取得には従来どおり`-Download`を使う。
+
+**Skia**：主ソースはSkiaSharp ZIPではなく[mono/skia固定commit](https://github.com/mono/skia/tree/7dbfc07dd33181f84e0958afb7ee805c6c769f0b)。`build-skia.ps1 -Action Acquire`が依存も取得する。主tar.gzのSHA256は`5265180696746618C344ACDA2916C9AD1022A0313289018197876CF2612743A9`。別形式のZIPや別版を改名して代用しない。
+
+C++環境はMSVC `14.29.30037`（cl FileVersion `19.29.30038.1`）、SDK `10.0.19041.0`。[MicrosoftのVS2019履歴](https://learn.microsoft.com/en-us/visualstudio/releases/2019/history)の16.10.2固定Build Tools bootstrapperを参照し、個別コンポーネント`Microsoft.VisualStudio.Component.VC.14.29.16.10.x86.x64`、`Microsoft.VisualStudio.Component.Windows10SDK.19041`、`Microsoft.VisualStudio.Component.VC.CMake.Project`を確認する。最新版v142の16.11系は別版。旧installerの取得・導入は今回未検証なので、導入後の版を必ず確認する。Ninjaにも固定SHAの検査がある。
+
+```powershell
+$skiaTools = @{
+    PythonExecutable = (Resolve-Path '.local/neural-openvoice/venv/Scripts/python.exe').Path
+    VisualStudioDirectory = 'C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools'
+    WindowsSdkDirectory = 'C:/Program Files (x86)/Windows Kits/10'
+}
+./native/build-skia.ps1 -Action Plan @skiaTools
+./native/build-skia.ps1 -Action Acquire @skiaTools
+./native/build-skia.ps1 -Action Prepare @skiaTools
+./native/build-skia.ps1 -Action Compile @skiaTools
+./native/build-skia.ps1 -Action Audit @skiaTools
+```
+
+Community等の同一版を使用する場合は`VisualStudioDirectory`、別配置のNinjaには`NinjaExecutable`を指定する。版・SHA検査は維持する。既定出力は`.local/build/skia-rebuild/win-x64-md/`。既存試行の継続時だけ`-Resume`を使う。別マシンのリンク時刻・絶対パス等で完成DLLのSHAが異なる可能性があり、Audit成功だけで製品の固定SHAとの一致は保証されない。既存の描画・ABI・許諾確認後に採用し、検査を無効化して合わせない。
+
+**OpenVoice**：公式repositoryへの接続が失敗する場合、固定tagを持つGit checkoutを別マシンから`.git`込みでコピーし、取得スクリプトに`-SourceRepository 'コピー先の絶対パス'`を指定できる。入力は変更せず、固定commitを新規checkoutする。通常ZIPはGit情報がないため使えない。部分cloneで不足objectがある場合は元の通信可能環境で取得を完了させる。CMake依存の取得は別途必要で、完全オフラインビルドを保証するものではない。失敗したWorkRootは検査用に残るので、内容と稼働参照を確認して整理し、再取得には新しいWorkRootを使う。
+
+### OpenVoice専用ランタイムを初めて生成する
+
+モデル変換とONNX Runtimeの生成は別工程。`pip install onnxruntime`のDLLは専用ランタイムの代用ではない。固定ソースは[Microsoft ONNX Runtime](https://github.com/microsoft/onnxruntime)、tag `v1.23.2`、commit `a83fc4d58cb48eb68890dd689f94f28288cf2278`。[取得スクリプト](native/acquire-openvoice-ort.ps1)は新しい作業先へ取得して、このcommitとの完全一致を検査する。
+
+```powershell
+$ortWork = Join-Path $PWD '.local/build/openvoice-first'
+./native/acquire-openvoice-ort.ps1 -WorkRoot $ortWork
+
+$ortTools = @{
+    WorkRoot = $ortWork
+    PythonExecutable = (Resolve-Path '.local/neural-openvoice/venv/Scripts/python.exe').Path
+    CmakeExecutable = (Resolve-Path '.local/neural-openvoice/venv/Lib/site-packages/cmake/data/bin/cmake.exe').Path
+    # 実際の固定版ツールの導入先に合わせる。Community等の同一版も指定可能。
+    VisualStudioDirectory = 'C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools'
+    WindowsSdkDirectory = 'C:/Program Files (x86)/Windows Kits/10'
+}
+# CPU基準パッチを適用し、CMakeが固定依存ソースを準備。コンパイルはしない。
+./native/build-openvoice-ort.ps1 @ortTools -ConfigureOnly
+# 同じ作業先・依存を再利用して採用構成の差分を適用・検査。
+./native/build-openvoice-ort.ps1 @ortTools -FusedConv -Col2im1D -PrepareOnly
+./native/build-openvoice-ort.ps1 @ortTools -FusedConv -Col2im1D
+```
+
+各コマンドの失敗時は次へ進まず、表示された入力・版を確認する。`-PrepareOnly`は依存ダウンロードを行わないため、初回の`-ConfigureOnly`を省略しない。初回configureには上流依存の取得通信が必要。FusedConv／Col2imのconfigureは取得済み依存を使う。`-ConfigureOnly`と`-PrepareOnly`は併用不可。生成先は`$ortWork/ort-build/`で、最大2並列・1回600秒のコンパイル上限がある。時間切れ後は同じ採用構成で再開する。`-RowSplit`は採用構成ではないので付けない。
+
+生成DLL・モデル・manifest・CRT・許諾と対象ソースを上記`native-openvoice`入力へ揃え、`neural-test`等の検証を通してから製品へ採用する。ビルド成功だけで現行の固定DLLハッシュと一致するとは限らない。異なるハッシュを検査回避のために書き換えない。
 
 自前runtimeの入口は[native/build-openvoice-ort.ps1](native/build-openvoice-ort.ps1)。ORTの固定commit `a83fc4d58cb48eb68890dd689f94f28288cf2278`と、既存のVS2019/MSVC 19.29.30038.1・SDK 10.0.19041.0・Ninja 1.10.2・CMake 3.31.6を使う。全構成で`.local/build/`直下の独立した子フォルダーを`-WorkRoot`へ明示する。sourceはその`ort-source/`、生成物は`ort-build/`、子TEMPは`tmp/`。未指定・範囲外・リンク経由は拒否する。`-PrepareOnly`はsource/patch/tool検査のみ、外すとconfigureと最大600秒・2threadのcompileを行う。既定外の既存toolは`-GitExecutable`／`-CmakeExecutable`／`-NinjaExecutable`／`-VisualStudioDirectory`／`-WindowsSdkDirectory`／`-PythonExecutable`で指定する。依存は固定checkoutの`cmake/deps.txt`のURL/hashに従う。通常製品へ自動コピーせず、実link/依存/許諾と下記数値試験を確認してから同梱入力のhashを更新する。
 

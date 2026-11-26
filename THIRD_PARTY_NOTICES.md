@@ -281,3 +281,7 @@ VVM共通規約が許諾する再配布はアプリ組込み。生成音声を�
 2026-11-23 NIT長文境界修正：Windows DLL SHA-256 b3c483117d983336fc152805a8732f8e5e7dfd6d00a1b84ec04a0315dc9c8966。監査 .local/build/open-jtalk/audit-20261123-180305-2d4109a3。固定toolchain、PE import/export、linked membersは既採用版と一致し、追加依存なし。NIT専用のNJD短休止挿入のみ変更。許諾文は従来通り保持。
 
 2026-11-23 間延びモード追加：Windows Open JTalk DLL SHA-256 200c9249e57df9bef944e59b083054c667a96629aa8586300b04f025b3192fd7。audit-20261123-183016-4b48d01c。既存ABIを維持してtoj_synthesize_drawn_outを追加。toolchain/import/linked members従来一致、追加依存なし。
+
+### Supertonic用ONNX Runtime許諾原本の保全
+
+固定v1.28.2のLICENSE/ThirdPartyNotices取得URLの404に備え、従来の監査済み入力と同一bytesをassets/supertonic-ort-LICENSE.txtとassets/supertonic-ort-NOTICES.txtへ保持する。prepare-supertonic.ps1の固定SHA照合を維持し、別版の条件へ置換しない。実行DLLやモデルの追加・更新ではない。

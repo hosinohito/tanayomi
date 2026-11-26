@@ -12,11 +12,13 @@ param(
     [switch]$RowSplit,
     [ValidateRange(1, 2)][int]$Parallel = 2,
     [ValidateRange(1, 600)][int]$BuildDeadlineSeconds = 600,
-    [switch]$PrepareOnly
+    [switch]$PrepareOnly,
+    [switch]$ConfigureOnly
 )
 # Development-only CPU build. Requires a separately prepared, pinned source
 # checkout and tool environment; never copies artifacts into a running product.
 $ErrorActionPreference = 'Stop'
+if ($PrepareOnly -and $ConfigureOnly) { throw 'PrepareOnly and ConfigureOnly cannot be combined.' }
 if ([string]::IsNullOrWhiteSpace($WorkRoot)) { throw 'Specify an explicit WorkRoot directly under repository .local/build.' }
 if (-not $IsWindows) { throw 'The audited native configuration targets Windows x64.' }
 $taskIdentity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -270,6 +272,7 @@ if ($RowSplit) {
     ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $taskOutput 'requested-build.json') -Encoding utf8
 if ($PrepareOnly) { Write-Output 'Pinned source, patch, tools and build settings prepared; no configure or compilation performed.'; return }
 Invoke-OwnedBuild $taskFlags 300 'configure'
+if ($ConfigureOnly) { Write-Output 'Pinned CPU configuration and dependencies prepared; no compilation performed.'; return }
 Invoke-OwnedBuild @('--build', $taskOutput, '--config', 'Release', '--target', 'onnxruntime', '--parallel', [string]$Parallel) $BuildDeadlineSeconds 'build'
 Get-ChildItem -LiteralPath $taskOutput -Filter 'onnxruntime.dll' -Recurse -File | ForEach-Object {
     [pscustomobject]@{Path=$_.FullName;Bytes=$_.Length;Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash} | ConvertTo-Json -Compress

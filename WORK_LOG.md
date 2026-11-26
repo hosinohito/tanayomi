@@ -1815,3 +1815,12 @@
 - 検証：README全相対リンクの実在とPowerShellコードブロックの構文解析に成功。既存実装との静的照合であり、新規環境での全再構築は行っていない。文書のみのため製品再build/再試験/試用copyは不要。環境インストール、既存版/data変更、一時物作成なし。
 - 文書差分を指定mainへcommit/pushしremote一致を確認する。今回依頼は反映照合で完了。R26は具体的な次候補未確定、他OS/公開実行物の保留を維持。
 <!-- WORK_LOG_ENTRY_END -->
+<!-- WORK_LOG_ENTRY -->
+## 20261127-01 — 2026-11-27 08:57:41 +09:00
+
+- 別マシンでの取得失敗を受け、READMEだけでは不足していた準備scriptを修正。GPT-6.1-solの独立調査/差分を統合。Aivis既定を固有package-IDから共通packageへ変更、明示環境変数で生成先指定。MSBuild既定/override評価成功。
+- ORT固定tag/commit取得と既存local Git取得を追加、CPU ConfigureOnlyで初回依存準備を分離。公式remoteはRepository not foundを再現、local固定checkout経路は新規領域で成功しコピー清掃。元source/試用版/data変更なし。公式接続成功や全nativebuild成功とはしない。
+- Supertonic許諾16件のうちORT2件が404、他14件は固定SHA一致。監査済み2原本をassetsに追加し不足時補完、破損拒否/既存再利用/構文を検証。.gitattributesで2原本の改行変換を禁止。
+- SkiaへVS/SDK/Ninja引数を追加し既定/空白入りPlanと固定環境構築を確認。archive/compiler/hash条件は緩和せず、旧installer導入と別PC生成DLL採用は未検証。READMEに具体順序と条件を記載。全相対リンク/PowerShell例構文成功。
+- 変更を指定mainへpushしremote一致確認。製品合成コードは変更せず今回新tryoutなし。R26/他OS/公開実行物の既存保留を維持。
+<!-- WORK_LOG_ENTRY_END -->

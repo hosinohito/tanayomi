@@ -1,0 +1,3 @@
+# Preserve the audited license bytes regardless of core.autocrlf.
+assets/supertonic-ort-LICENSE.txt -text
+assets/supertonic-ort-NOTICES.txt -text
