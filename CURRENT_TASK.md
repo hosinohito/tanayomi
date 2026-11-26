@@ -8,7 +8,7 @@
 最新依頼：別マシンの固定資産取得・生成手順を整備してpushする。
 到達点：Aivis固有IDを既定入力から除去（今後このPCでも既存package-4a8ce577e6f5417b9d9e90a508e0f8c2を使うpublish時はAivisDirectoryを明示）。Supertonic許諾2件の404を再現し原本をassetsへ固定SHAのまま同梱、改行変換を.gitattributesで抑止。SkiaのVS/SDK/Ninja配置引数追加。ORT固定Git取得scriptとConfigureOnly、ローカルGit入力を追加。READMEへ順序・取得・生成・採用条件を記載。
 検証：変更script/README例の構文・全相対リンク、Supertonic補完/破損拒否、Skia Plan/環境指定、MSBuild既定/override確認。実既存ORTから新規checkout成功、元source不変・検証コピー清掃済み。公式ORT remote取得はRepository not foundで未成功。新規PC全native再build、旧VSinstaller取得、生成DLLの採用監査は未検証で完了扱いしない。
-次操作：今回の変更をcommit/pushしremote一致確認。準備手順と取得経路の修正が今回範囲。製品再build/新tryoutは未作成、既存版/data不変。別PCの完全再構築は上記外部条件・監査が残る。
+統合確認：push時に別PCの32adeda（UTAU改善）を検出し通常mergeで保護。共通試験は不合格（初回UtauContextTests、再確認AivisPcmProtocolTestsの割当量assertion）。今回の準備script検証とは別に未解決として保持。次操作：統合記録をcommit/pushしremote一致確認。準備手順と取得経路の修正が今回範囲。製品再build/新tryoutは未作成、既存版/data不変。別PCの完全再構築は上記外部条件・監査が残る。
 容量：完了ORT col2im/fusedの再生成可能LIB/OBJ252個1,400,306,855bytesを検査後清掃。最初のpublish resources抑制は効かず容量不足、失敗したbin/resourcesのみ安全清掃してcsprojの明示metadataへ修正。再publish成功、通常buildコピー維持。旧141155版削除の個別承認ありだが、実行時に指定フォルダーが既に消えており削除せず。空き約28GBへ変化したことを観測。181159版/dataを保護して新183929版の作成・照合完了。
 前提：通常モードの長文修正は利用者が『治った』と確認済み。今回ONはその修正前を意図して選ぶ機能。品質比較の詳細はRESEARCH、履歴はWORK_LOG。
 

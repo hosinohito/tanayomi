@@ -1823,4 +1823,5 @@
 - Supertonic許諾16件のうちORT2件が404、他14件は固定SHA一致。監査済み2原本をassetsに追加し不足時補完、破損拒否/既存再利用/構文を検証。.gitattributesで2原本の改行変換を禁止。
 - SkiaへVS/SDK/Ninja引数を追加し既定/空白入りPlanと固定環境構築を確認。archive/compiler/hash条件は緩和せず、旧installer導入と別PC生成DLL採用は未検証。READMEに具体順序と条件を記載。全相対リンク/PowerShell例構文成功。
 - 変更を指定mainへpushしremote一致確認。製品合成コードは変更せず今回新tryoutなし。R26/他OS/公開実行物の既存保留を維持。
+- pushは別PCの更新32adedaにより一度拒否。fetch/通常mergeでUTAU改善を保護して統合。共通試験を追加実施したが初回UtauContextTestsで終了、詳細再確認はAivisPcmProtocolTestsの割当量assertionで不合格。準備script個別成功と区別し、全体合格とは報告しない。製品音声修正を今回へ追加せず残件として記録。
 <!-- WORK_LOG_ENTRY_END -->
