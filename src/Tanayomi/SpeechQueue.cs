@@ -267,7 +267,7 @@ public sealed class SpeechQueue : IAsyncDisposable
                     Publish(new("読み上げ", text, age.TotalMilliseconds));
                     try { await primary.SpeakAsync(text, item.Token).ConfigureAwait(false); }
                     catch (OperationCanceledException) when (item.IsCancellationRequested) { throw; }
-                    catch (Exception error) when (fallback is not null && primary.CanFallback)
+                    catch (Exception error) when (error is not UtauPlaybackStartedException && fallback is not null && primary.CanFallback)
                     {
                         Publish(new("警告", "選択した音声が使えないため、標準音声へ切り替えます。", Diagnostic:
                             DiagnosticEvent.Create(DiagnosticCode.SpeechFallback, DiagnosticOperation.SpeechPrimary,
@@ -289,7 +289,7 @@ public sealed class SpeechQueue : IAsyncDisposable
                     // Do not expose credentials, input text, or paths embedded in exception messages.
                     Publish(new("エラー", $"音声処理に失敗しました（{ex.GetType().Name}）。次の発言を続けます。", Diagnostic:
                         DiagnosticEvent.Create(DiagnosticCode.SpeechFailed,
-                            fallback is not null && primary.CanFallback ? DiagnosticOperation.SpeechFallback : DiagnosticOperation.SpeechPrimary,
+                            ex is not UtauPlaybackStartedException && fallback is not null && primary.CanFallback ? DiagnosticOperation.SpeechFallback : DiagnosticOperation.SpeechPrimary,
                             DiagnosticRecovery.NextUtterance, ex)));
                 }
                 finally

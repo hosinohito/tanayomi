@@ -105,7 +105,7 @@ Linux認証はOS側の[libsecretのsecret-tool](https://github.com/GNOME/libsecr
 
 - 取得元：[JPreprocess Team / naist-jdic](https://github.com/jpreprocess/naist-jdic/tree/394af50de2da4a9c73b1bd04fab43e85bb6f03ff)、固定コミット`394af50de2da4a9c73b1bd04fab43e85bb6f03ff`。2026-10-24に対象コミットの`naist-jdic.csv`・`matrix.def`・`COPYING`の実物を確認した。
 - 条件：[対象版COPYING](https://github.com/jpreprocess/naist-jdic/blob/394af50de2da4a9c73b1bd04fab43e85bb6f03ff/COPYING)にあるBSD-3-Clause形式の4表示（NAIST 2009、UniDic Consortium 2011–2017、名古屋工業大学 2008–2016、JPreprocess Team 2023）。著作権・条件・免責の保持と、名称を無断で推奨表示に使用しない条件。ソース公開・再リンク義務、非商用・用途制限、ICOT条件は対象COPYINGには含まれない。
-- アプリに埋め込む`assets/naist-jdic.bin.gz`は表記・左右文脈ID・単語コスト・発音と接続コスト表のみを保持した派生データ（486,688項目、1,377×1,377接続）。変換処理は`assets/build-reading-dictionary.py`。元の品詞・アクセント列および`unidic-csj.csv`等は収録しない。
+- アプリに埋め込む`assets/naist-jdic.bin.gz`は表記・左右文脈ID・単語コスト・発音と接続コスト表のみを保持した派生データ（486,688項目、1,377×1,377接続）。変換処理は`assets/build-reading-dictionary.py`。読み本体は変更せず、同じ固定版から一般名詞のアクセント（位置／モーラ数）だけを抽出した別表 `assets/naist-jdic-accents.bin.gz` を埋め込む。元の品詞列・元CSV・`unidic-csj.csv` は収録しない。別表は91,092件、SHA-256 `c290fdf838ea5bcf6856ff2b5ee572e4ec894bf8617014fc665e31a8d1a5c189`、再生成は `assets/build-reading-accents.py`。
 - `assets/naist-jdic.COPYING`に上記COPYING全文を保持し、アセンブリへ埋め込み、実行・配布先の`naist-jdic.COPYING`にもコピーする。バイナリ配布時はこのファイルと本書を保持する。
 - 元CSVのSHA-256：`140e0b8189732fa1e65d22079f399b895cb5d7e6ba8b1b1afed656d3fb10b84e`。接続表のSHA-256：`b8ff0c65c1024680ebf81b820d789435c64b039d077666e67b34093f041eb36a`。派生データのSHA-256：`c465adf0a064d678d35ac4a45871214ec00107d3a12c537d227749738099fcda`。
 - この導入は辞書データのみ。独自のC#最短経路読み変換・UTAU単独音接合を使い、MeCab／NMeCab／Open JTalk／HTS Engineのコードやネイティブライブラリー、推移パッケージ、学習済み音声モデルは追加していない。音声の条件は上記「同梱音源」と利用者が選んだ音源のそれぞれに従う。
