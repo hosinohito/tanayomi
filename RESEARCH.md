@@ -2,6 +2,8 @@
 
 確認日：2026-10-26（テーマ別の確認日は各節）。技術比較・機能調査・採用検討の正本。実施履歴は[WORK_LOG.md](WORK_LOG.md)、タスク状態は[PROJECT_STATUS.md](PROJECT_STATUS.md)、確定した製品動作は[SPEC.md](SPEC.md)、許諾条件の詳細は[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)を参照する。調査だけで採用・実装・実機確認済みとはしない。
 
+本書の過去の比較WAV・試聴用生成物への言及は、調査時の条件を示す。2026-11-27の整理依頼により、プロジェクト内の比較音声・旧試用実行物は削除対象となった。既存の測定結論と正式な再現試験は保持し、過去のローカル成果物が現在も存在するとは扱わない。
+
 ## 外部resamplerの配置依存障害
 
 2026-11-03の追加観測では、既存の所有子ハンドルだけでCPU時間・累積I/Oを取得した。同じ固定音源・エンジン・引数でCWD83を固定したところ、TEMP88は395ms、TEMP83も370msで正常終了し、どちらも妥当WAVだった。読込み3回132834 bytes・書込み25回68417 bytesが一致し、終了時CPUは375/343.75ms。以前タイムアウトした条件も成功したので、TEMP文字列の長さだけでは失敗を予測できない。今回は失敗中の活動を観測できず、原因未確定。次回は新たに再現したケースを使い、条件を変えない反復は行わない。集計APIはファイル名・失敗理由を返さない。[Microsoft GetProcessIoCounters](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getprocessiocounters)

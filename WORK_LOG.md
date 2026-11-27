@@ -1929,3 +1929,13 @@
 - R31最終引渡し。実装・手順・固定入力・許諾・試験53ファイルをc818c01でGitHub mainへ通常pushし、remoteとHEADのSHA一致を確認。許諾原文の空白はhash維持のため変更せず、それ以外のGit差分検査成功。生成物・秘密・利用者dataはコミット対象外。
 - CURRENT_TASK／PROJECT_STATUSを完了へ更新。今回の依頼範囲は検証・ソース反映まで完了。別PCの完全空環境一括実行は未実施、R30聴感待ち・R26候補未確定・他OS/実行物公開保留は維持。共有プロセスと担当は終了し、動作中と称するバックグラウンド作業はない。
 <!-- WORK_LOG_ENTRY_END -->
+<!-- WORK_LOG_ENTRY -->
+## 20261127-05 — 2026-11-27 10:29:10 +09:00
+
+- R32：利用者の完全削除依頼に従い、一時テスト・生成物・用途不明物を棚卸し。非.local側は独立担当がGit追跡/README参照を確認し、不要な単発scriptなし。正式source/tests、Git、利用者data、最新11/27フル機能app、用途確定の.NET/LLVM/Python/MSVC開発ツールを保持。
+- 旧build/bin/obj/native、ORT/Skiaの取得source・中間・Stage、旧tryout実行物、比較PCM、モデル/package重複、NuGet/pip/取得cache、tmp、調査生ログ等を直接削除。退避・archive・復元コピーなし。過去の比較物保持指定は今回指示で解除。再構築script/固定lock/正式原音はGit側に保持。
+- パスを.local配下へ限定し、全reparse pointとproject実行processがないことを確認。各版dataは元位置に残し、最新app/data8506ファイルは最終清掃前後SHA/件数一致。旧build/bin/build/world/tryout配下のdata外ファイル0。最新版の外部依存リンクなし。削除のみなので製品再buildは行わない。
+- 一度Aivis許諾cacheの所有者差で削除停止し、全フォルダーの再削除はauto-reviewが開発tool混入の可能性で拒否。個別8ファイルを製品内の同一SHA許諾/sourceコピーと照合し、所有者のsandboxから個別削除。残存モデル/wheel/packageは固定入力lockと照合して生成物と確認後に清掃再開・成功。ACL/恒久設定変更なし。最終残件なし。
+- .localの棚卸し約41.94GiBから約6.98GiBへ縮小、約35GiB削除。最終段階だけの削除は16108files/9491370587bytes、前段も含む総量は棚卸し差分の概算。今回専用.cleanup-once.ps1も削除した。
+- 最新exeはC:/work/tanayomi/.local/build/app/Tanayomi.Desktop.exe。旧試用版はdataだけ保持。CURRENT_TASK/PROJECT_STATUS/RESEARCHの現存参照を更新。依頼範囲完了、公開配布/他OS/R30聴感/R26未確定の状態は維持。
+<!-- WORK_LOG_ENTRY_END -->
