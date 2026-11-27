@@ -3,6 +3,12 @@
 更新日時：2026-11-27 08:57:41 +09:00。引き継ぎID：20261127-01。
 依頼一覧・優先順はPROJECT_STATUS.md。R26はユーザーの明示終了まで未完。Windows以外と公開配布は保留。
 
+## 別PCでの Windows x64 再構築（2026-11-27）
+
+構築手順更新 ef5a314 を取り込み、固定した共通ロックのまま Windows x64 publish に成功。別の開発フォルダーに準備済みだった WORLD・Open JTalk／NIT・VOICEVOX・Supertonic・Aivis／JVNV と追加HTS音声を使用した。出力はこのチェックアウトの `.local/build/app/Tanayomi.Desktop.exe`。以前の開発機の試用版と利用者データには変更なし。
+
+フル機能版の残りは、OpenVoice専用ORTと監査済みSkia。Microsoft公式ORTのタグ取得はGit認証要求で中断。固定コミットの既存ソースはあるが、専用DLLを生成・採用するには指定MSVC／Windows SDKの構成が必要。Skia本体の固定アーカイブは取得できたが、libjpeg-turboの固定アーカイブがSHA-256不一致で取得中断。いずれの検査も緩和せず、通常Skiaでビルドした。Open JTalkの製品試験85項目、Aivis／JVNV・VOICEVOX・Supertonicの製品試験129項目、UTAU製品の固定文PCM検査に合格。共通試験は、上流でも記録されていたAivisの最大PCMフレーム割り当て量テストで停止。
+
 ## 現在の目的・到達点
 
 最新依頼：別マシンの固定資産取得・生成手順を整備してpushする。
@@ -39,3 +45,11 @@
 - 採用native：OpenVoice 1054ABA195985786A160E1F0220527B34734FACD5CA32D8DBEF094A53A07846C、WORLD 6D07EBC9B9854065A3F5428E71FF05212221449F2BD640541519D82757AC3FFF。監査の入口はREADME/THIRD_PARTY_NOTICES。col2im/fusedの限定source・監査、WORLD audit-20261027-080217-8175a433とaudit-20261027-074410-aa27613bを保護。
 - 品質基準：.local/previews/utau-devoicing-20261026-174938-ba809dc08d4443b88b657180e082ab0e/のA/B/conditions.json。B PCM7966B6CCF30AB43444453A8C8557B11EA233FA5AB803391D24F0E4027109E243を次の品質基準更新まで保持。同じ比較の再生成/質問なし。
 - Open JTalk採用監査：.local/build/open-jtalk/audit-20261123-183016-4b48d01c。DLL SHA256 200C9249E57DF9BEF944E59B083054C667A96629AA8586300B04F025B3192FD7。旧監査とのtoolchain/flags/import/export/linked-member一致を確認。採用版の由来証跡として置換監査まで保持。入口README。
+
+## R30 WindowsのシンプルUTAU：実機録音を基準に音程の段差を減らす（2026-11-25、引き継ぎID 20261125-11）
+
+棒読みちゃんの提供録画をローカルで計測し、付属CVの前版で母音の前半と後半が別の音程に分かれる現象を確認。発話ごとの共通音程を有声の母音頭から決め、有声区間の立ち上がりを原音の周期から共通曲線へ緩やかに接続する。旧音量補正・句の先読みは維持。句内音量を揃える案は、頭が目立つ音が増えたため不採用。
+
+旧版設定は変更しない。試聴版と比較PCMはユーザーの判断まで保持。次に録音にあった後半の山を追う場合は、原文・音源・唄詠でのアクセント設定を揃えてから切り分ける。今回の波形差は全体の聴感一致を意味しない。検証条件と再生成先はRESEARCH。
+
+GitHub mainにシンプルUTAUの音声改善と合成方式メニュー変更を反映済み（32adeda）。Windowsの対象検査108件合格。録画と試聴成果物はローカルのみ。

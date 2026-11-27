@@ -176,6 +176,8 @@ Unix向けWORLDの監査用入力は[native/build-world-unix.ps1](native/build-w
 
 ### 合成方式の製品確認
 
+Windows版の内蔵UTAU「シンプル（波形接続）」は、句読点で区切れる長文を先読みし、句全体のピッチ曲線を原音の有声部分へ適用する。比較時は起動プロセスで `TANAYOMI_UTAU_PREFETCH_TRIAL=0`、`TANAYOMI_UTAU_CONTINUOUS_PITCH=0`、`TANAYOMI_UTAU_VOICED_JOIN=0` を個別に指定できる（旧位相接続の設定はピッチ曲線が無効のときに適用）。開発確認はテスト実行ファイルの `--utau-prefetch-trial-check`（PCM受渡し）と `--utau-voiced-join-check`（旧方式の継ぎ目）と `--utau-continuous-pitch-check`（最終波形の基本周波数、促音、先読み）と `--utau-overlap-envelope-check`（重なり、原音の音頭）を使う。音量の新旧比較では `TANAYOMI_UTAU_COMPLEMENTARY_ENVELOPE=0` と `TANAYOMI_UTAU_ATTACK_ENVELOPE=0` を使い、連続ピッチを維持したまま無効化できる。名詞のアクセントだけの比較は `TANAYOMI_UTAU_LEXICAL_ACCENT=0`（専用確認 `--utau-lexical-accent-check`）。弱い先行部分の接続だけを以前と比較するには `TANAYOMI_UTAU_LEAD_HANDOFF=0`（専用確認 `--utau-lead-handoff-check`。任意の第2引数は既存のWAV出力先）。
+
 Windows標準音声の増幅経路は、リポジトリ直下で `./dev.ps1 windows-volume-test -Configuration Release` を実行する。実SAPIをメモリーへ合成し400%の波形を確認する。音声の再生・ファイル保存は行わない。Windowsと利用可能なSAPI音声が必要。
 
 
@@ -191,7 +193,7 @@ NIT＋OpenVoiceの長文間延びを切り分ける明示診断は、開発版pu
 python assets/build-reading-dictionary.py
 ```
 
-`assets/naist-jdic.bin.gz`と`assets/naist-jdic.COPYING`を再生成する。派生辞書と許諾文を保持し、版や内容を変更する場合は第三者表示も更新する。
+`assets/naist-jdic.bin.gz`と`assets/naist-jdic.COPYING`を再生成する。続けて `python assets/build-reading-accents.py` で同じ固定版と読み辞書に対応するアクセント表を再生成する。派生辞書と許諾文を保持し、版や内容を変更する場合は第三者表示も更新する。
 
 ### WORLD比較用のネイティブビルド
 
