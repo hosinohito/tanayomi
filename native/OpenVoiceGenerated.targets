@@ -1,0 +1,28 @@
+<Project>
+  <!-- Opt-in for a source-built candidate. Its manifest hash is an explicit
+       build input; a file beside a DLL alone never changes the accepted hash. -->
+  <PropertyGroup Condition="'$(OpenVoiceGeneratedManifestSha256)' != ''">
+    <DefineConstants>$(DefineConstants);REBUILT_OPENVOICE</DefineConstants>
+  </PropertyGroup>
+  <Target Name="ValidateOpenVoiceGeneratedIdentity" Condition="'$(OpenVoiceGeneratedManifestSha256)' != ''">
+    <Error Condition="'$(OpenVoiceNativeDirectory)' == ''" Text="Specify OpenVoiceNativeDirectory for the generated candidate." />
+    <PropertyGroup>
+      <_OpenVoiceManifest>$(OpenVoiceNativeDirectory)/generated-runtime.xml</_OpenVoiceManifest>
+      <_OpenVoiceIdentity>$(IntermediateOutputPath)RebuiltOpenVoiceIdentity.g.cs</_OpenVoiceIdentity>
+    </PropertyGroup>
+    <GetFileHash Files="$(_OpenVoiceManifest)" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="_OpenVoiceManifestHash" /></GetFileHash>
+    <Error Condition="'%(_OpenVoiceManifestHash.FileHash)' != '$(OpenVoiceGeneratedManifestSha256)'" Text="Generated OpenVoice manifest hash mismatch." />
+    <XmlPeek XmlInputPath="$(_OpenVoiceManifest)" Query="/OpenVoice/Source/text()"><Output TaskParameter="Result" PropertyName="_OpenVoiceSource" /></XmlPeek>
+    <XmlPeek XmlInputPath="$(_OpenVoiceManifest)" Query="/OpenVoice/Patch/text()"><Output TaskParameter="Result" PropertyName="_OpenVoicePatch" /></XmlPeek>
+    <XmlPeek XmlInputPath="$(_OpenVoiceManifest)" Query="/OpenVoice/Sha256/text()"><Output TaskParameter="Result" PropertyName="_OpenVoiceHash" /></XmlPeek>
+    <XmlPeek XmlInputPath="$(_OpenVoiceManifest)" Query="/OpenVoice/Bytes/text()"><Output TaskParameter="Result" PropertyName="_OpenVoiceBytes" /></XmlPeek>
+    <Error Condition="'$(_OpenVoiceSource)' != 'a83fc4d58cb48eb68890dd689f94f28288cf2278' or '$(_OpenVoicePatch)' != 'E8D0642CAE49EF71C28A9475266AC26B2140B3C0C10B21FB45CD4F820800DC5E'" Text="Unexpected generated OpenVoice source identity." />
+    <Error Condition="!$([System.Text.RegularExpressions.Regex]::IsMatch('$(_OpenVoiceHash)', '^[A-F0-9]{64}$')) or !$([System.Text.RegularExpressions.Regex]::IsMatch('$(_OpenVoiceBytes)', '^[1-9][0-9]{0,8}$'))" Text="Invalid generated OpenVoice file identity." />
+    <GetFileHash Files="$(OpenVoiceNativeDirectory)/onnxruntime.dll" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="_OpenVoiceDllHash" /></GetFileHash>
+    <Error Condition="'%(_OpenVoiceDllHash.FileHash)' != '$(_OpenVoiceHash)'" Text="Generated OpenVoice DLL hash mismatch." />
+  </Target>
+  <Target Name="GenerateOpenVoiceIdentity" BeforeTargets="CoreCompile" DependsOnTargets="ValidateOpenVoiceGeneratedIdentity" Condition="'$(OpenVoiceGeneratedManifestSha256)' != ''">
+    <WriteLinesToFile File="$(_OpenVoiceIdentity)" Lines="namespace Tanayomi.Desktop { internal static class RebuiltOpenVoiceIdentity { internal const string Sha256 = &quot;$(_OpenVoiceHash)&quot;%3B internal const int Bytes = $(_OpenVoiceBytes)%3B } }" Overwrite="true" WriteOnlyWhenDifferent="true" />
+    <ItemGroup><Compile Include="$(_OpenVoiceIdentity)" /></ItemGroup>
+  </Target>
+</Project>

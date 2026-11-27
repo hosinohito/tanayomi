@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "bertBase": "https://huggingface.co/tsukumijima/deberta-v2-large-japanese-char-wwm-onnx/resolve/d701ec67708287b20d2063270f6b535e6eed09ab/",
+  "jvnvBase": "https://huggingface.co/litagin/style_bert_vits2_jvnv/resolve/205830ca1d49e666ddfbf2a755f0108e9cade4dd/",
+  "hubPolicy": "The Hub download API returns only the newest AIVMX. Require locked version and checksum metadata before download, then verify payload SHA. If upstream changes, preserve the audited local original; never accept a newer model automatically.",
+  "inputs": [
+    {
+      "path": "python.zip",
+      "url": "https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip",
+      "sha256": "009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b"
+    },
+    {
+      "path": "engine.zip",
+      "url": "https://github.com/Aivis-Project/AivisSpeech-Engine/archive/refs/tags/1.2.0.zip",
+      "sha256": "471f0a3f8aaa1f776d5cd4558466ce7eef702b34383806bf46d1c2593c46ba1f"
+    },
+    {
+      "path": "sbv2.zip",
+      "url": "https://github.com/tsukumijima/Style-Bert-VITS2/archive/1588a46595141a04652f9aae486f8a625c04ce55.zip",
+      "sha256": "b11048860e91ccfcd4f67bedd15f666d3037d78de790ab2c9346ed9642c358ba"
+    },
+    {
+      "path": "e2k.zip",
+      "url": "https://github.com/tsukumijima/e2k/archive/9920754e15d8c96404bef0bd81d424352fb7a48b.zip",
+      "sha256": "c8967f626702eed2645dcc27e68aa65e5181bcbde9df05ceda9f16adc2c35779"
+    },
+    {
+      "path": "Microsoft.VC.14.44.17.14.CRT.Redist.X64.base.vsix",
+      "url": "https://download.visualstudio.microsoft.com/download/pr/45d3b8dd-bced-4b37-9974-142f748d710c/4aaf54db0bfc9435f7c3660e1a00237a4b556042bfeea64bde44c2e0194e6ee5/Microsoft.VC.14.44.17.14.CRT.Redist.X64.base.vsix",
+      "sha256": "4aaf54db0bfc9435f7c3660e1a00237a4b556042bfeea64bde44c2e0194e6ee5"
+    },
+    {
+      "path": "sources/soxr-0.5.0.post1.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/02/c0/4429bf9b3be10e749149e286aa5c53775399ec62891c6b970456c6dca325/soxr-0.5.0.post1.tar.gz",
+      "sha256": "7092b9f3e8a416044e1fa138c8172520757179763b85dc53aa9504f4813cff73"
+    },
+    {
+      "path": "sources/num2words-0.5.14.tar.gz",
+      "url": "https://files.pythonhosted.org/packages/f6/58/ad645bd38b4b648eb2fc2ba1b909398e54eb0cbb6a7dbd2b4953e38c9621/num2words-0.5.14.tar.gz",
+      "sha256": "b066ec18e56b6616a3b38086b5747daafbaa8868b226a36127e0451c0cf379c6"
+    },
+    {
+      "path": "licenses/Eigen-source.zip",
+      "url": "https://github.com/eigen-mirror/eigen/archive/1d8b82b0740839c0de7f1242a3585e3390ff5f33/eigen-1d8b82b0740839c0de7f1242a3585e3390ff5f33.zip",
+      "sha256": "6a60d76351f97132669daeeb721d6bf14b008101883ad2d687a3201c5c461eb0"
+    },
+    {
+      "path": "licenses/ACML-1.0.md",
+      "bundled": "assets/aivis/ACML-1.0.md",
+      "sha256": "72ac22ef56c20f9d9ca8467ca9bdcc5e06e5fba5270812a9ff1494b00ae6d02a"
+    },
+    {
+      "path": "licenses/ACML-source-MIT.txt",
+      "bundled": "assets/aivis/ACML-source-MIT.txt",
+      "sha256": "48bddf7ed3702db2b1fedb26eadefc10c329c393d9d8b7477597669244716ff0"
+    },
+    {
+      "path": "licenses/CC-BY-SA-3.0.txt",
+      "bundled": "assets/aivis/CC-BY-SA-3.0.txt",
+      "sha256": "3f941b3b89cf7b8370ceb83cc76d2120d471b58735d8ca60238a751a48d7f72f"
+    },
+    {
+      "path": "licenses/CC-BY-SA-4.0.txt",
+      "bundled": "assets/aivis/CC-BY-SA-4.0.txt",
+      "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5"
+    },
+    {
+      "path": "licenses/CMUdict-BSD-2-Clause.txt",
+      "bundled": "assets/aivis/CMUdict-BSD-2-Clause.txt",
+      "sha256": "bd4ce8e44170a5f9f481310ca85c51de3c4f851a65e679b40e603b143bd3542a"
+    },
+    {
+      "path": "licenses/FlatBuffers-Apache-2.0.txt",
+      "bundled": "assets/aivis/FlatBuffers-Apache-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "path": "licenses/GPL-3.0.txt",
+      "bundled": "assets/aivis/GPL-3.0.txt",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "path": "licenses/Loguru-MIT.txt",
+      "bundled": "assets/aivis/Loguru-MIT.txt",
+      "sha256": "b35d026cc7aca9d5859a02eb87ddf7a386a24c986838651bd1f283f94e003327"
+    },
+    {
+      "path": "licenses/SudachiPy-Apache-2.0.txt",
+      "bundled": "assets/aivis/SudachiPy-Apache-2.0.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "licenses/Tokenizers-Apache-2.0.txt",
+      "bundled": "assets/aivis/Tokenizers-Apache-2.0.txt",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "licenses/Eigen-MPL-2.0.txt",
+      "bundled": "assets/aivis/Eigen-MPL-2.0.txt",
+      "sha256": "66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172"
+    },
+    {
+      "path": "licenses/Microsoft-VC-Runtime-LICENSE.txt",
+      "bundled": "assets/microsoft-vc-runtime-LICENSE.txt",
+      "sha256": "38c113f791fdd03fa9316f0f743201cb54a1c8c9b683b615a906ea2fea7c8b6e"
+    }
+  ]
+}

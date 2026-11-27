@@ -1,0 +1,20 @@
+<Project>
+  <!-- A requested full build must never silently omit an optional engine. -->
+  <Target Name="ValidateFullWindowsBuild" BeforeTargets="PrepareForBuild" Condition="'$(TanayomiFullBuild)' == 'true'">
+    <Error Condition="'$(RuntimeIdentifier)' != 'win-x64'" Text="Full build requires win-x64." />
+    <Error Condition="'$(WorldNativeEnabled)' != 'true'" Text="Full build: WORLD is missing." />
+    <Error Condition="'$(OpenJtalkNativeEnabled)' != 'true'" Text="Full build: Open JTalk is missing." />
+    <Error Condition="'$(OpenVoiceNativeEnabled)' != 'true'" Text="Full build: OpenVoice is missing." />
+    <Error Condition="'$(AuditedSkiaEnabled)' != 'true'" Text="Full build: audited Skia is missing; NuGet fallback is not a full build." />
+    <ItemGroup>
+      <FullBuildRequired Include="$(OpenJtalkNativeDirectory)/open-jtalk-build.json;$(OpenJtalkNativeDirectory)/nitech_jp_atr503_m001.htsvoice;$(OpenJtalkNativeDirectory)/dictionary/char.bin;$(OpenJtalkNativeDirectory)/dictionary/matrix.bin;$(OpenJtalkNativeDirectory)/dictionary/sys.dic;$(OpenJtalkNativeDirectory)/dictionary/unk.dic" />
+      <FullBuildRequired Include="$(TohokuOpenJtalkDirectory)/tohoku-f01-neutral.htsvoice;$(TohokuOpenJtalkDirectory)/tohoku-f01-angry.htsvoice;$(TohokuOpenJtalkDirectory)/tohoku-f01-happy.htsvoice;$(TohokuOpenJtalkDirectory)/tohoku-f01-sad.htsvoice" />
+      <FullBuildRequired Include="$(MmdagentVoiceDirectory)/mei/COPYRIGHT.txt;$(MmdagentVoiceDirectory)/takumi/COPYRIGHT.txt;$(MmdagentVoiceDirectory)/mei/mei_normal.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_angry.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_bashful.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_happy.htsvoice;$(MmdagentVoiceDirectory)/mei/mei_sad.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_normal.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_angry.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_happy.htsvoice;$(MmdagentVoiceDirectory)/takumi/takumi_sad.htsvoice" />
+      <FullBuildRequired Include="$(VoicevoxDirectory)/voicevox-assets.json;$(SupertonicDirectory)/supertonic-assets.json;$(AivisDirectory)/voices.json" />
+      <FullBuildRequired Include="$(OpenVoiceNativeDirectory)/reference.onnx;$(OpenVoiceNativeDirectory)/converter.onnx;$(OpenVoiceNativeDirectory)/onnxruntime.dll;$(OpenVoiceNativeDirectory)/eigen-source.zip;$(OpenVoiceNativeDirectory)/eigen-LICENSE.txt;$(OpenVoiceNativeDirectory)/onnxruntime-NOTICES.txt" />
+      <FullBuildRequired Include="$(OpenVoiceNativeDirectory)/msvcp140.dll;$(OpenVoiceNativeDirectory)/vcruntime140.dll;$(OpenVoiceNativeDirectory)/vcruntime140_1.dll;$(OpenVoiceNativeDirectory)/onnxruntime-LICENSE.txt;$(OpenVoiceNativeDirectory)/OpenVoice-LICENSE.txt;$(OpenVoiceNativeDirectory)/OpenVoice-NOTICE.txt;$(OpenVoiceNativeDirectory)/microsoft-vc-runtime-LICENSE.txt" />
+      <FullBuildRequired Include="$(SkiaNativeDirectory)/libSkiaSharp.dll;$(SkiaNativeDirectory)/msvcp140.dll;$(SkiaNativeDirectory)/vcruntime140.dll;$(SkiaNativeDirectory)/vcruntime140_1.dll;$(SkiaNativeDirectory)/skia-build.json;$(SkiaNativeNotice)" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(FullBuildRequired.Identity)')" Text="Full build input missing: %(FullBuildRequired.Identity). Run the documented acquisition/build step." />
+  </Target>
+</Project>

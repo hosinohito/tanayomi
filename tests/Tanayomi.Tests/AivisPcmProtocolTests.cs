@@ -135,7 +135,7 @@ internal static class AivisPcmProtocolTests
         check(observedCancellation && partial.Position > 16 && partial.Position < partial.Length,
             "Aivis reports caller cancellation after partial PCM without returning audio");
 
-        await CheckPcmAllocationsAsync(check);
+        CheckPcmAllocations(check);
     }
 
     private static short[] CreateSamples(int count)
@@ -157,38 +157,44 @@ internal static class AivisPcmProtocolTests
         return frame;
     }
 
-    private static async Task CheckPcmAllocationsAsync(Action<bool, string> check)
+    private static void CheckPcmAllocations(Action<bool, string> check)
     {
         using var stream = new MemoryStream(PcmReply(CreateSamples(AivisPcmProtocol.MaxSamples)), writable: false);
-        _ = await ReadPreviousPcmAsync(stream);
+        _ = ReadPreviousPcmAsync(stream).GetAwaiter().GetResult();
         stream.Position = 0;
-        _ = await AivisPcmProtocol.ReadResponseAsync(stream, false, default);
+        _ = AivisPcmProtocol.ReadResponseAsync(stream, false, default).GetAwaiter().GetResult();
 
+        // MemoryStream completes reads synchronously. Keep the allocation counters on this
+        // thread instead of silently omitting the assertion after an async continuation.
         stream.Position = 0;
-        var thread = Environment.CurrentManagedThreadId;
         var before = GC.GetAllocatedBytesForCurrentThread();
-        _ = await ReadPreviousPcmAsync(stream);
-        if (Environment.CurrentManagedThreadId != thread) return;
+        _ = ReadPreviousPcmAsync(stream).GetAwaiter().GetResult();
         var previous = GC.GetAllocatedBytesForCurrentThread() - before;
 
         stream.Position = 0;
         before = GC.GetAllocatedBytesForCurrentThread();
-        _ = await AivisPcmProtocol.ReadResponseAsync(stream, false, default);
-        if (Environment.CurrentManagedThreadId != thread) return;
+        _ = AivisPcmProtocol.ReadResponseAsync(stream, false, default).GetAwaiter().GetResult();
         var saved = previous - (GC.GetAllocatedBytesForCurrentThread() - before);
         var expected = AivisPcmProtocol.MaxSamples * sizeof(short) - 32 * 1024;
-        check(saved >= expected - 1024, $"Aivis maximum-frame PCM decode saves {saved:N0} allocated bytes");
+        check(saved >= expected - 1024, $"Aivis maximum-frame PCM payload storage saves {saved:N0} allocated bytes with matching read chunks");
     }
 
     private static async Task<PcmAudio> ReadPreviousPcmAsync(Stream stream)
     {
-        // The former success path held both the full byte payload and the final sample array.
+        // Preserve the former full byte payload plus final sample array allocation layout.
+        // Match the current reader's chunk boundaries so per-read async framework overhead
+        // cancels out: this comparison measures payload storage, not the number of reads.
         var header = new byte[16];
-        await stream.ReadExactlyAsync(header);
+        await stream.ReadExactlyAsync(header).ConfigureAwait(false);
         var rate = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(8));
         var length = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(12));
         var bytes = new byte[length];
-        await stream.ReadExactlyAsync(bytes);
+        for (var offset = 0; offset < length;)
+        {
+            var count = Math.Min(32 * 1024, length - offset);
+            await stream.ReadExactlyAsync(bytes.AsMemory(offset, count)).ConfigureAwait(false);
+            offset += count;
+        }
         var samples = new short[length / sizeof(short)];
         Buffer.BlockCopy(bytes, 0, samples, 0, bytes.Length);
         return new(samples, rate);

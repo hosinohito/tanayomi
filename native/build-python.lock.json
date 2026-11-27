@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "purpose": "Development interpreter only; never copied into the product runtime",
+  "version": "3.12.14",
+  "release": "20260814",
+  "archive": "cpython-3.12.14+20260814-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+  "directory": "cpython-3.12.14-20260814-windows-x64",
+  "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260814/cpython-3.12.14%2B20260814-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+  "sha256": "89f18f6932917163b74339ebcec2645c8e47ae7f1c5f2ac37f2b4f4cf3beb647",
+  "bytes": 21976599,
+  "releaseSource": "https://github.com/astral-sh/python-build-standalone/releases/tag/20260814",
+  "formatSource": "https://gregoryszorc.com/docs/python-build-standalone/main/distributions.html#install-only-archive"
+}

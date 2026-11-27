@@ -14,8 +14,11 @@ try {
     }
     if (Test-Path -LiteralPath $taskRoot) { throw 'WorkRoot already exists; choose a new path.' }
     $taskGit = if ($GitExecutable) { [IO.Path]::GetFullPath($GitExecutable) } else { (Get-Command git.exe -ErrorAction Stop).Source }
-    $taskOrigin = 'https://github.com/microsoft/onnxruntime.git'
-    if (-not [string]::IsNullOrWhiteSpace($SourceRepository)) {
+    $taskLock = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'openvoice-ort-source.lock.json') -Raw | ConvertFrom-Json
+    if ($taskLock.schema -ne 1 -or $taskLock.algorithm -ne 'git-tree-blob-sha256-v1') { throw 'Unsupported ORT source lock.' }
+    $taskOrigin = $taskLock.primary
+    $taskLocalSource = -not [string]::IsNullOrWhiteSpace($SourceRepository)
+    if ($taskLocalSource) {
         $taskOrigin = [IO.Path]::GetFullPath($SourceRepository)
         if (-not (Test-Path -LiteralPath $taskOrigin -PathType Container)) { throw 'SourceRepository must be an existing local Git checkout or transferred copy.' }
         for ($taskCurrent = $taskOrigin; $taskCurrent; $taskCurrent = [IO.Path]::GetDirectoryName($taskCurrent)) {
@@ -39,6 +42,12 @@ try {
             $taskInfo.WorkingDirectory = $taskRoot
             $taskInfo.Environment['GIT_TERMINAL_PROMPT'] = '0'
             $taskInfo.Environment['GIT_NO_LAZY_FETCH'] = '1'
+            $taskInfo.Environment['GCM_INTERACTIVE'] = 'Never'
+            $taskInfo.Environment['GIT_ASKPASS'] = ''
+            foreach ($taskArgument in @('-c','credential.helper=','-c','core.askPass=')) { $taskInfo.ArgumentList.Add($taskArgument) }
+            if ($taskLocalSource) {
+                $taskInfo.ArgumentList.Add('-c'); $taskInfo.ArgumentList.Add("safe.directory=$($taskOrigin.Replace('\','/'))")
+            }
             foreach ($taskArgument in $Arguments) { $taskInfo.ArgumentList.Add($taskArgument) }
             $taskProcess = [Diagnostics.Process]::Start($taskInfo)
             try {
@@ -49,12 +58,44 @@ try {
             } finally { if (-not $taskProcess.HasExited) { $taskProcess.Kill($true); $null = $taskProcess.WaitForExit(5000) }; $taskProcess.Dispose() }
         }
         $taskSource = Join-Path $taskRoot 'ort-source'
-        $taskClone = @('-c', 'core.autocrlf=false', 'clone', '--branch', 'v1.23.2', '--single-branch', '--no-checkout')
-        $taskClone += if ($SourceRepository) { @('--no-hardlinks') } else { @('--depth', '1') }
-        $null = Invoke-SourceGit ($taskClone + @($taskOrigin, $taskSource))
-        $taskCommit = 'a83fc4d58cb48eb68890dd689f94f28288cf2278'
-        if ((Invoke-SourceGit @('-C', $taskSource, 'rev-parse', 'HEAD')) -ne $taskCommit -or (Invoke-SourceGit @('-C', $taskSource, 'rev-parse', 'refs/tags/v1.23.2^{commit}')) -ne $taskCommit) { throw 'Selected tag does not match the pinned commit; source retained for inspection.' }
-        $null = Invoke-SourceGit @('-C', $taskSource, '-c', 'core.autocrlf=false', 'checkout', '--detach', $taskCommit)
+        $taskClone = @('-c', 'core.autocrlf=false', 'clone', '--branch', $taskLock.tag, '--single-branch', '--no-checkout')
+        $taskClone += if ($taskLocalSource) { @('--no-hardlinks') } else { @('--depth', '1') }
+        $taskCandidate = Join-Path $taskRoot 'source-primary'
+        try {
+            $null = Invoke-SourceGit ($taskClone + @($taskOrigin, $taskCandidate))
+        } catch {
+            if ($taskLocalSource) { throw }
+            Write-Output 'The primary ORT repository could not be fetched; trying the fixed source-only mirror.'
+            $taskOrigin = $taskLock.mirror
+            $taskCandidate = Join-Path $taskRoot 'source-mirror'
+            $null = Invoke-SourceGit ($taskClone + @($taskOrigin, $taskCandidate))
+        }
+        $taskCommit = $taskLock.commit
+        if ((Invoke-SourceGit @('-C', $taskCandidate, 'rev-parse', 'HEAD')) -ne $taskCommit -or
+            (Invoke-SourceGit @('-C', $taskCandidate, 'rev-parse', "refs/tags/$($taskLock.tag)^{commit}")) -ne $taskCommit -or
+            (Invoke-SourceGit @('-C', $taskCandidate, 'rev-parse', 'HEAD^{tree}')) -ne $taskLock.tree) { throw 'Selected tag, commit or tree does not match the source lock; source retained for inspection.' }
+        . (Join-Path $PSScriptRoot 'verify-openvoice-ort-source.ps1')
+        $taskDigest = Get-OrtSourceCanonicalDigest $taskGit $taskCandidate
+        if ($taskDigest.Sha256 -ne $taskLock.canonicalSha256 -or $taskDigest.Entries -ne $taskLock.entries -or $taskDigest.Gitlinks -ne $taskLock.gitlinks) { throw 'ORT complete source-content digest differs from the trusted source lock; source retained for inspection.' }
+        # The upstream attributes request native/CRLF checkout for some files. This
+        # fresh developer checkout must contain the verified Git blob bytes exactly.
+        # Override transforms only in this invocation's new clone, never user settings.
+        $taskAttributes = [IO.File]::Open((Join-Path $taskCandidate '.git/info/attributes'), [IO.FileMode]::CreateNew)
+        try { $taskAttributeBytes = [Text.Encoding]::ASCII.GetBytes("* -text -ident -filter`n"); $taskAttributes.Write($taskAttributeBytes) } finally { $taskAttributes.Dispose() }
+        $null = Invoke-SourceGit @('-C', $taskCandidate, 'config', '--local', 'core.longpaths', 'true')
+        $null = Invoke-SourceGit @('-C', $taskCandidate, '-c', 'core.autocrlf=false', 'checkout', '--detach', $taskCommit)
+        if ((Get-OrtSourceCanonicalDigest $taskGit $taskCandidate -CheckWorkingTree).Sha256 -ne $taskLock.canonicalSha256) { throw 'ORT checkout bytes differ from the source-object lock; source retained for inspection.' }
+        [IO.Directory]::Move($taskCandidate, $taskSource)
+        $taskFailedPrimary = Join-Path $taskRoot 'source-primary'
+        if ($taskCandidate -ne $taskFailedPrimary -and (Test-Path -LiteralPath $taskFailedPrimary)) {
+            if ((Resolve-Path -LiteralPath $taskFailedPrimary).Path -ne $taskFailedPrimary -or [IO.Path]::GetDirectoryName($taskFailedPrimary) -ne $taskRoot) { throw 'Unexpected failed clone cleanup path.' }
+            foreach ($taskEntry in @(Get-Item -LiteralPath $taskFailedPrimary -Force) + @(Get-ChildItem -LiteralPath $taskFailedPrimary -Recurse -Force)) {
+                if ($taskEntry.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'Failed clone cleanup refused linked entries.' }
+            }
+            # Every owned Git process has exited before this success-only cleanup.
+            Remove-Item -LiteralPath $taskFailedPrimary -Recurse -Force
+        }
+        Write-Output ('Verified complete ORT source: ' + $taskDigest.Sha256 + '; origin: ' + $taskOrigin)
         Write-Output ('Pinned source prepared: ' + $taskSource)
     } finally {
         if ($null -ne $taskGuard) { $taskGuard.Dispose() }

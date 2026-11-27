@@ -1910,3 +1910,16 @@
 - 上流 ef5a314 を取り込み、ローカルのR30文書5件を統合。Windowsだけで再生成されたロック差分は採用せず、既存の複数RIDを保ったまま locked restore に成功。録画・試用バイナリ・音声資産はコミット対象外。
 - 更新READMEに従ってWindows x64のpublishとOpen JTalk（85）・同梱音声（129）・UTAU固定文PCMの製品試験に成功。専用ORTのタグ取得とSkiaの固定libjpeg-turbo取得には失敗し、通常Skiaの部分構成でビルド。共通試験は既知のAivis割り当て量テストで再現。
 <!-- WORK_LOG_ENTRY_END -->
+<!-- WORK_LOG_ENTRY -->
+## 20261127-03 — 2026-11-27 10:15:17 +09:00
+
+- 目的：別PCでも旧開発機の固有path/資産/CodexなしでWindowsフル機能版を構築できるよう取得・生成・採用経路を整理。独立したMSVC/Skia/Aivis担当をGPT-6.1-solで並列化し主担当が統合。
+- 固定portable MSVC/Ninja/CRT3461ファイル、Python3.12.14とvenv、音声原本、Aivis109入力/許諾の取得を実装・検証。SDK19041は公式固定installer取得と導入後検査、本人の導入操作をREADMEに明記。既存venv・OS設定は変更しない。
+- ORT公式repository取得停止に対し固定mirrorのcommit/tree/全9431entry/内容SHAを信頼済みsourceと照合し、新取得checkoutの物理bytesも検査。新cloneだけ改行変換禁止・longpaths設定。SkiaのGitiles archive差は固定展開entry内容同一性で判定し、hashを無条件に緩和しない。
+- 新WORLD/Open JTalkをsource/member/include/flags policyで検証。新Skiaを全compile/PE/ABI/link/画像codec/日本語描画まで検査、新OpenVoice専用ORTを固定toolchainで生成しsource/patch/PE/link/model/許諾をStageで検査。生成DLLはmanifest SHAを明示した構成だけで採用、製品のDLL検査は維持。
+- Aivis割当検査の比較サイズと計測thread条件、現行UTAUの古い期待値を修正。共通・各native・publish・完成exeのOpen JTalk、同梱音声全方式、OpenVoice5文/退避0、UTAU波形方式をpublish-full-windows.ps1で実行し終了コード0。出力.local/build/app/Tanayomi.Desktop.exe。既存試用版とdataは不変。
+- 回帰：full不足8/生成identity5、Python準備12、音声取得24、runtime policy22、ORT source9、Skia取得8成功。PowerShell構文とREADME例/相対リンク成功。最後の独立手順reviewでWORLD取得順序と新ORT cloneの長いpath対応を補完。
+- 範囲：完全に空の別Windows上で全工程を通した結果ではない。既存の固定変換済み音声モデルとSDKを再使用。新取得とnew native build/製品合成の成功を、全モデル再変換や他OS/公開配布の完了へ拡大しない。
+- 一時fixtureはfinally清掃。今回専用の旧OpenVoice検証stage146620283bytesは稼働参照確認後削除。採用Stage/source/MAP/receipt/cacheは再現根拠として保持しCURRENT_TASKに記載。
+- 状態：実装・full検証完了、GitHubへソースと手順を反映する。公開実行物・他OS保留、R30聴感待ち、R26は具体候補未確定で既採否を反復しない。
+<!-- WORK_LOG_ENTRY_END -->

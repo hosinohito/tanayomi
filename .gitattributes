@@ -1,3 +1,10 @@
 # Preserve the audited license bytes regardless of core.autocrlf.
 assets/supertonic-ort-LICENSE.txt -text
 assets/supertonic-ort-NOTICES.txt -text
+assets/aivis/** -text
+assets/microsoft-vc-runtime-LICENSE.txt -text
+# These source/recipe bytes are part of the portable native audit policy.
+native/build-world-llvm.ps1 -text
+native/build-open-jtalk.ps1 -text
+native/world-bridge.cpp -text
+native/open-jtalk-bridge.cpp -text

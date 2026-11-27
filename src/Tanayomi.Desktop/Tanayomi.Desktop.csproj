@@ -72,5 +72,7 @@
     <None Include="$(AivisDirectory)/**/*" Exclude="$(AivisDirectory)/archive-audit.json" Link="resources/aivis/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="$(RuntimeResourceCopy)" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <Import Project="../../native/SkiaNative.targets" />
+  <Import Project="../../native/OpenVoiceGenerated.targets" />
+  <Import Project="../../native/FullWindowsBuild.targets" />
 </Project>
 

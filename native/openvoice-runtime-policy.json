@@ -1,0 +1,119 @@
+{
+  "source": "a83fc4d58cb48eb68890dd689f94f28288cf2278",
+  "patch": "E8D0642CAE49EF71C28A9475266AC26B2140B3C0C10B21FB45CD4F820800DC5E",
+  "linkedLibraries": [
+    "absl_base",
+    "absl_city",
+    "absl_examine_stack",
+    "absl_graphcycles_internal",
+    "absl_hash",
+    "absl_hashtablez_sampler",
+    "absl_int128",
+    "absl_kernel_timeout_internal",
+    "absl_log_globals",
+    "absl_log_internal_format",
+    "absl_log_internal_globals",
+    "absl_log_internal_log_sink_set",
+    "absl_log_internal_message",
+    "absl_log_internal_nullguard",
+    "absl_log_internal_proto",
+    "absl_log_sink",
+    "absl_malloc_internal",
+    "absl_raw_hash_set",
+    "absl_raw_logging_internal",
+    "absl_spinlock_wait",
+    "absl_stacktrace",
+    "absl_str_format_internal",
+    "absl_strerror",
+    "absl_strings",
+    "absl_strings_internal",
+    "absl_symbolize",
+    "absl_synchronization",
+    "absl_throw_delegate",
+    "absl_time",
+    "absl_time_zone",
+    "cpuinfo",
+    "libprotobuf-lite",
+    "msvcprt",
+    "MSVCRT",
+    "onnx",
+    "onnx_proto",
+    "onnxruntime_common",
+    "onnxruntime_flatbuffers",
+    "onnxruntime_framework",
+    "onnxruntime_graph",
+    "onnxruntime_lora",
+    "onnxruntime_mlas",
+    "onnxruntime_optimizer",
+    "onnxruntime_providers",
+    "onnxruntime_session",
+    "onnxruntime_util",
+    "re2"
+  ],
+  "exports": [
+    "OrtGetApiBase",
+    "OrtSessionOptionsAppendExecutionProvider_CPU"
+  ],
+  "files": [
+    {
+      "name": "converter.onnx",
+      "bytes": 128049101,
+      "sha256": "A63E14E74DE2B963A8FC544BF778E28A65520525C76DAB94DD75A6DB466789CA"
+    },
+    {
+      "name": "eigen-LICENSE.txt",
+      "bytes": 16727,
+      "sha256": "66A3107D5AD6A058AAB753EAAC2047CCB2ED0E39465DD0FE5844DA3E300D5172"
+    },
+    {
+      "name": "eigen-source.zip",
+      "bytes": 4075744,
+      "sha256": "6A60D76351F97132669DAEEB721D6BF14B008101883AD2D687A3201C5C461EB0"
+    },
+    {
+      "name": "microsoft-vc-runtime-LICENSE.txt",
+      "bytes": 6696,
+      "sha256": "38C113F791FDD03FA9316F0F743201CB54A1C8C9B683B615A906EA2FEA7C8B6E"
+    },
+    {
+      "name": "msvcp140.dll",
+      "bytes": 565648,
+      "sha256": "43A9666C2F405258F165B53082860AC7838039A75FD2E85286085EDE0DA0273B"
+    },
+    {
+      "name": "onnxruntime-LICENSE.txt",
+      "bytes": 1094,
+      "sha256": "C250D6278F0B47A6439FB7592B08B58A55EB9F535AA49A1DB63211C3F982B674"
+    },
+    {
+      "name": "onnxruntime-NOTICES.txt",
+      "bytes": 333022,
+      "sha256": "E00F828E0A33DE591A355AE6606D2625F5758DA7D2C844DB7821C9DD3E3647B6"
+    },
+    {
+      "name": "OpenVoice-LICENSE.txt",
+      "bytes": 1057,
+      "sha256": "BB3541F421E6273D3A3E3DD5BDBA2BD3B79A3C2EADCA65CDE9C62C2467903AC0"
+    },
+    {
+      "name": "OpenVoice-NOTICE.txt",
+      "bytes": 490,
+      "sha256": "05AC0D3127E1EB5EE35B5E79892770EB216B4356155FAFCCA7DAA8BE8163A59E"
+    },
+    {
+      "name": "reference.onnx",
+      "bytes": 3258423,
+      "sha256": "0A0B7E0BEC15CCD2C0466F67FAA0387F3E81480C12B8B46DC295B3E8AD3F986D"
+    },
+    {
+      "name": "vcruntime140_1.dll",
+      "bytes": 37256,
+      "sha256": "6C1E531C25AB2934A4EA9970598BC751D924D7CC5650DF3E1282B61D6CD24F42"
+    },
+    {
+      "name": "vcruntime140.dll",
+      "bytes": 97160,
+      "sha256": "C865C3366A98431EC3A5959CB5AC3966081A43B82DFCD8BFEFAFE0146B1508DB"
+    }
+  ]
+}

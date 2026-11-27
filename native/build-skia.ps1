@@ -1,8 +1,9 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('Plan','Acquire','Prepare','Compile','Audit')][string]$Action='Plan',
+    [ValidateSet('Plan','Acquire','Prepare','Compile','Audit','Stage')][string]$Action='Plan',
     [string]$WorkRoot='', [string]$OutputDirectory='', [string]$PythonExecutable='',
     [string]$VisualStudioDirectory='', [string]$WindowsSdkDirectory='', [string]$NinjaExecutable='',
+    [string]$StageDirectory='', [string]$ManagedAuditPath='', [string]$CrtDirectory='',
     [ValidateRange(1,2)][int]$Parallel=2,
     [ValidateRange(1,600)][int]$BuildDeadlineSeconds=600,
     [switch]$Resume
@@ -169,6 +170,55 @@ function Set-DirectSkiaToolchain {
     [IO.File]::WriteAllBytes($path,$bytes)
 }
 function Read-SkiaExports([string]$Text){@([regex]::Matches($Text,'(?m)^\s+\d+\s+[0-9A-F]+\s+[0-9A-F]+\s+(\S+)')|ForEach-Object{$_.Groups[1].Value}|Sort-Object -CaseSensitive)}
+function Get-SkiaGraphPins {
+    @(Get-ChildItem -LiteralPath $output -Filter '*.ninja' -File -Recurse|Sort-Object FullName|ForEach-Object{
+        Assert-SkiaPath $_.FullName $output
+        [pscustomobject]@{Path=[IO.Path]::GetRelativePath($output,$_.FullName).Replace('\','/');Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}
+    })
+}
+function Stage-VerifiedSkia {
+    if([string]::IsNullOrWhiteSpace($StageDirectory) -or [string]::IsNullOrWhiteSpace($ManagedAuditPath) -or [string]::IsNullOrWhiteSpace($CrtDirectory)){throw 'Stage requires explicit StageDirectory, ManagedAuditPath and CrtDirectory.'}
+    $stage=[IO.Path]::GetFullPath($StageDirectory);Assert-SkiaPath $stage (Join-Path $workspace '.local/build')
+    if(Test-Path -LiteralPath $stage){throw 'Existing Skia stage is preserved; choose a new StageDirectory.'}
+    $managedPath=[IO.Path]::GetFullPath($ManagedAuditPath);Assert-SkiaPath $managedPath (Join-Path $workspace '.local')
+    $crt=[IO.Path]::GetFullPath($CrtDirectory)
+    $candidate=Join-Path $output 'libSkiaSharp.dll';$candidateHash=(Get-FileHash -LiteralPath $candidate -Algorithm SHA256).Hash
+    $receiptPath=Join-Path $audit 'formal-compile.json';$receipt=Get-Content -LiteralPath $receiptPath -Raw|ConvertFrom-Json
+    $planPath=Join-Path $audit 'formal-plan.json';$plan=Get-Content -LiteralPath $planPath -Raw|ConvertFrom-Json
+    if(-not $receipt.ExitConfirmed -or $receipt.CandidateSha256-cne $candidateHash -or $receipt.MapSha256-cne (Get-FileHash -LiteralPath (Join-Path $output 'libSkiaSharp.map') -Algorithm SHA256).Hash -or
+       $receipt.PlanSha256-cne (Get-FileHash -LiteralPath $planPath -Algorithm SHA256).Hash -or $receipt.SourcePinsSha256-cne (Get-FileHash -LiteralPath (Join-Path $audit 'formal-source-pins.json') -Algorithm SHA256).Hash){throw 'Stage requires the unchanged successful formal compile receipt, source pins, plan, DLL and MAP.'}
+    if($plan.Output-cne $output -or -not $plan.SourceVerified -or $plan.CompileCommands-ne 1248 -or $plan.DngPiex -or $plan.StaticCrt -or
+       $plan.ArgsSha256-cne (Get-FileHash -LiteralPath (Join-Path $output 'args.gn') -Algorithm SHA256).Hash -or
+       $plan.ToolchainSha256-cne (Get-FileHash -LiteralPath (Join-Path $source 'gn/toolchain/BUILD.gn') -Algorithm SHA256).Hash -or
+       ($plan.GraphPins|ConvertTo-Json -Depth 4 -Compress)-cne ((Get-SkiaGraphPins)|ConvertTo-Json -Depth 4 -Compress)){throw 'Stage requires unchanged formal prepared source and build graph.'}
+    if((Get-Item -LiteralPath $managedPath).Length-gt 1MB){throw 'Managed Skia audit result exceeds its bound.'}
+    $managed=Get-Content -LiteralPath $managedPath -Raw|ConvertFrom-Json
+    if($managed.NativeSha256-cne $candidateHash -or $managed.ManagedPackage-cne '3.119.4' -or -not $managed.MalformedInputRejected -or
+       $managed.Japanese.MissingGlyphs-ne 0 -or $managed.Japanese.DarkPixels-lt 500 -or $managed.Japanese.DarkPixels-gt 20000 -or
+       @($managed.Decodes).Count-ne 5 -or @($managed.Encodes|Where-Object{$_.Supported -and $_.Format-in @('Png','Jpeg','Webp')}).Count-ne 3){throw 'Stage requires a successful managed raster/codec/Japanese smoke result for the exact DLL.'}
+    $runtimePins=@{'msvcp140.dll'='43A9666C2F405258F165B53082860AC7838039A75FD2E85286085EDE0DA0273B';'vcruntime140.dll'='C865C3366A98431EC3A5959CB5AC3966081A43B82DFCD8BFEFAFE0146B1508DB';'vcruntime140_1.dll'='6C1E531C25AB2934A4EA9970598BC751D924D7CC5650DF3E1282B61D6CD24F42'}
+    foreach($name in $runtimePins.Keys){$path=Join-Path $crt $name;for($parent=$path;$parent;$parent=Split-Path -Parent $parent){if((Get-Item -LiteralPath $parent -Force).Attributes-band [IO.FileAttributes]::ReparsePoint){throw 'Linked CRT staging input refused.'}};if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash-cne $runtimePins[$name]){throw 'Fixed CRT staging input changed.'}}
+    $staging=$stage+'.stage-'+[Guid]::NewGuid().ToString('N');Assert-SkiaPath $staging (Join-Path $workspace '.local/build')
+    try{
+        New-Item -ItemType Directory -Path (Join-Path $staging 'audit')|Out-Null
+        Copy-Item -LiteralPath $candidate -Destination (Join-Path $staging 'libSkiaSharp.dll')
+        foreach($name in $runtimePins.Keys){Copy-Item -LiteralPath (Join-Path $crt $name) -Destination (Join-Path $staging $name)}
+        foreach($name in @('formal-plan.json','formal-compile.json','formal-source-pins.json','formal-dll-audit.json','formal-license-inputs.json')){Copy-Item -LiteralPath (Join-Path $audit $name) -Destination (Join-Path $staging ('audit/'+$name))}
+        Copy-Item -LiteralPath $managedPath -Destination (Join-Path $staging 'audit/managed-smoke.json')
+        Copy-Item -LiteralPath (Join-Path $audit 'Skia-NOTICE.txt') -Destination (Join-Path $staging 'skia-native-NOTICES.txt')
+        [ordered]@{schema=2;target='win-x64';skiaSharp='3.119.4';skiaCommit='7dbfc07dd33181f84e0958afb7ee805c6c769f0b';dng=$false;piex=$false;crt='dynamic /MD';library='libSkiaSharp.dll';sha256=$candidateHash;namedExports=924;validated=@('native ABI','managed raster','Japanese glyphs','PNG JPEG WebP GIF decode','PNG JPEG WebP encode');gpuValidated=$false;publicDistributionAuditComplete=$false}|
+            ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $staging 'skia-build.json') -Encoding utf8
+        $document=[Xml.XmlDocument]::new();$root=$document.CreateElement('SkiaBuild');[void]$document.AppendChild($root)
+        foreach($pair in @{Schema='1';SourceCommit='7dbfc07dd33181f84e0958afb7ee805c6c769f0b';Runtime='dynamic /MD';PeVerified='true';ManagedVerified='true';CandidateSha256=$candidateHash}.GetEnumerator()){$root.SetAttribute($pair.Key,$pair.Value)}
+        foreach($file in Get-ChildItem -LiteralPath $staging -File -Recurse|Sort-Object FullName){$entry=$document.CreateElement('File');$entry.SetAttribute('Path',[IO.Path]::GetRelativePath($staging,$file.FullName).Replace('\','/'));$entry.SetAttribute('Sha256',(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash);[void]$root.AppendChild($entry)}
+        $document.Save((Join-Path $staging 'skia-generated.xml'))
+        if((Get-FileHash -LiteralPath (Join-Path $staging 'libSkiaSharp.dll') -Algorithm SHA256).Hash-cne $candidateHash){throw 'Candidate changed while staging.'}
+        foreach($name in $runtimePins.Keys){if((Get-FileHash -LiteralPath (Join-Path $staging $name) -Algorithm SHA256).Hash-cne $runtimePins[$name]){throw 'Fixed CRT changed while staging.'}}
+        if(Test-Path -LiteralPath $stage){throw 'Skia destination appeared while staging; existing directory preserved.'}
+        [IO.Directory]::Move($staging,$stage)
+        [pscustomobject]@{StageDirectory=$stage;SkiaGeneratedManifestSha256=(Get-FileHash -LiteralPath (Join-Path $stage 'skia-generated.xml') -Algorithm SHA256).Hash;CandidateSha256=$candidateHash;DistributionApproved=$false}|ConvertTo-Json
+    }finally{if(Test-Path -LiteralPath $staging){Assert-SkiaPath $staging (Join-Path $workspace '.local/build');Remove-Item -LiteralPath $staging -Recurse -Force}}
+}
 function Write-SkiaNotices {
     $notice=[Text.StringBuilder]::new()
     [void]$notice.AppendLine('Isolated SkiaSharp 3.119.4 / Skia 7dbfc07dd33181f84e0958afb7ee805c6c769f0b')
@@ -247,22 +297,26 @@ try{
             $baselineCompared=$true
         }
         [pscustomobject]@{SourceCommit='7dbfc07dd33181f84e0958afb7ee805c6c769f0b';CompileCommands=$compiles.Count;ArgsSha256=(Get-FileHash -LiteralPath $argsFile -Algorithm SHA256).Hash;
-            ToolchainSha256=(Get-FileHash -LiteralPath (Join-Path $source 'gn/toolchain/BUILD.gn') -Algorithm SHA256).Hash;SourceVerified=$true;BaselineCompared=$baselineCompared;DngPiex=$false;StaticCrt=$false;CompileStarted=$false;Version=$version.Trim();Output=$output}|
-            ConvertTo-Json -Depth 4|Set-Content -LiteralPath (Join-Path $audit 'formal-plan.json') -Encoding utf8
+            ToolchainSha256=(Get-FileHash -LiteralPath (Join-Path $source 'gn/toolchain/BUILD.gn') -Algorithm SHA256).Hash;GraphPins=@(Get-SkiaGraphPins);SourceVerified=$true;BaselineCompared=$baselineCompared;DngPiex=$false;StaticCrt=$false;CompileStarted=$false;Version=$version.Trim();Output=$output}|
+            ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $audit 'formal-plan.json') -Encoding utf8
         Write-Output $generated.Trim();Write-Output 'PASS: formal Skia preparation; no compiler was launched.'
     }
     elseif($Action-eq 'Compile'){
         $plan=Get-Content -LiteralPath (Join-Path $audit 'formal-plan.json') -Raw|ConvertFrom-Json
         if(-not $plan.SourceVerified -or $plan.CompileCommands-ne 1248 -or $plan.DngPiex -or $plan.StaticCrt){throw 'Verified formal Prepare output required.'}
-        if((Get-FileHash -LiteralPath (Join-Path $output 'args.gn') -Algorithm SHA256).Hash-cne $plan.ArgsSha256 -or
+        if($plan.Output-cne $output -or -not @($plan.GraphPins).Count -or ($plan.GraphPins|ConvertTo-Json -Depth 4 -Compress)-cne ((Get-SkiaGraphPins)|ConvertTo-Json -Depth 4 -Compress) -or
+           (Get-FileHash -LiteralPath (Join-Path $output 'args.gn') -Algorithm SHA256).Hash-cne $plan.ArgsSha256 -or
            (Get-FileHash -LiteralPath (Join-Path $source 'gn/toolchain/BUILD.gn') -Algorithm SHA256).Hash-cne $plan.ToolchainSha256){throw 'Prepared Skia configuration changed.'}
-        $previous=@(Get-ChildItem -LiteralPath $audit -File|Where-Object{$_.Name-match 'compile.*(?:\.|-)result\.json$'})
+        $previous=@(Get-ChildItem -LiteralPath $audit -File|Where-Object{$_.Name-match 'compile.*(?:\.|-)result\.json$' -and (Get-Content -LiteralPath $_.FullName -Raw|ConvertFrom-Json).Compiler})
         if($previous.Count -and -not $Resume){throw 'A previous compile exists; review it and explicitly choose -Resume.'}
         foreach($record in $previous){if(-not (Get-Content -LiteralPath $record.FullName -Raw|ConvertFrom-Json).ExitConfirmed){throw 'Previous compiler exit is unconfirmed.'}}
         $result=Invoke-SkiaCommand $ninja @('-C',$output,'-j',[string]$Parallel,'SkiaSharp') $attempt $BuildDeadlineSeconds -Compiler
+        [pscustomobject]@{ExitConfirmed=$true;CandidateSha256=(Get-FileHash -LiteralPath (Join-Path $output 'libSkiaSharp.dll') -Algorithm SHA256).Hash;MapSha256=(Get-FileHash -LiteralPath (Join-Path $output 'libSkiaSharp.map') -Algorithm SHA256).Hash;
+            PlanSha256=(Get-FileHash -LiteralPath (Join-Path $audit 'formal-plan.json') -Algorithm SHA256).Hash;SourcePinsSha256=(Get-FileHash -LiteralPath (Join-Path $audit 'formal-source-pins.json') -Algorithm SHA256).Hash}|
+            ConvertTo-Json|Set-Content -LiteralPath (Join-Path $audit 'formal-compile.json') -Encoding utf8
         Write-Output ('PASS: owned Skia compile, '+[Math]::Round($result.ElapsedSeconds,3)+'s; application outputs unchanged.')
     }
-    elseif($Action-eq 'Audit'){
+    elseif($Action-in @('Audit','Stage')){
         $target=Join-Path $output 'libSkiaSharp.dll';$reference=Join-Path $workspace '.local/nuget/skiasharp.nativeassets.win32/3.119.4/runtimes/win-x64/native/libSkiaSharp.dll'
         foreach($path in @($target,$reference,(Join-Path $output 'libSkiaSharp.map'))){if(-not(Test-Path -LiteralPath $path -PathType Leaf)){throw 'Completed candidate/reference/MAP required.'}}
         if((Get-FileHash -LiteralPath $reference -Algorithm SHA256).Hash-cne '7DEC3BA900AB353491E6446F0083739924C6F8DD668832E2F09D38EBFFDBBE1C'){throw 'Pinned original ABI reference changed.'}
@@ -283,7 +337,8 @@ try{
         [pscustomobject]@{CandidateSha256=(Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash;CandidateBytes=(Get-Item -LiteralPath $target).Length;NamedExports=$exports.Count;Dependencies=$dlls;UniqueLibraryObjects=$objects.Count;
             DngPiexObjects=0;StaticCrtObjects=0;SourceCommit='7dbfc07dd33181f84e0958afb7ee805c6c769f0b';GpuTested=$false;AvaloniaTested=$false;DistributionApproved=$false}|
             ConvertTo-Json -Depth 5|Set-Content -LiteralPath (Join-Path $audit 'formal-dll-audit.json') -Encoding utf8
-        Write-Output 'PASS: formal PE/ABI/object audit; managed/UI and distribution checks remain separate.'
+        if($Action-eq 'Stage'){Stage-VerifiedSkia}
+        else{Write-Output 'PASS: formal PE/ABI/object audit; managed/UI and distribution checks remain separate.'}
     }
 }finally{
     if($null-eq $script:SkiaUnconfirmedChild){

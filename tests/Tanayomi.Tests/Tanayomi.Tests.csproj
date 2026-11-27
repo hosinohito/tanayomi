@@ -37,6 +37,7 @@
     <PackageReference Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
   </ItemGroup>
   <Import Project="../../native/SkiaNative.targets" />
+  <Import Project="../../native/OpenVoiceGenerated.targets" />
   <Target Name="TrimWindowsX64TestNativeAssets" AfterTargets="ResolvePackageAssets"
           Condition="'$(OS)' == 'Windows_NT' and '$(RuntimeIdentifier)' == '' and
                      '$(NETCoreSdkPortableRuntimeIdentifier)' == 'win-x64' and

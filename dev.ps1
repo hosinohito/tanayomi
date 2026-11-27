@@ -7,13 +7,16 @@ param([ValidateSet('build', 'run', 'test', 'windows-volume-test', 'joins', 'nati
     [ValidateSet('all', 'aivis', 'voicevox', 'supertonic')][string]$BundledEngine = 'all',
     [string]$NeuralAudit, [string]$NeuralFixture, [switch]$NeuralProfile,
     [switch]$NeuralPreviousRuntime, [switch]$NeuralRuntimeBenchmark, [switch]$NeuralRuntimeLifetime, [switch]$NeuralRuntimeCancel,
-    [string]$SkiaLibrary, [string]$SkiaSourceRoot, [switch]$SkiaFullSuite)
+    [string]$SkiaLibrary, [string]$SkiaSourceRoot, [switch]$SkiaFullSuite,
+    [string]$SkiaExpectedNativeSha256, [string]$SkiaAuditResultPath)
 $ErrorActionPreference = 'Stop'
 if ($UseExistingPublish -and $Action -ne 'tryout') { throw 'UseExistingPublish requires tryout.' }
 if ($BundledEngine -ne 'all' -and $Action -ne 'bundled-speech-product-test') { throw 'BundledEngine requires bundled-speech-product-test.' }
 if ($WorldLifterAudit -and ($Action -ne 'native-test' -or $WorldParallelResources)) { throw 'WorldLifterAudit requires native-test and excludes WorldParallelResources.' }
 if ($WorldParallelResources -and $Action -ne 'native-test') { throw 'WorldParallelResources requires native-test.' }
 if ($SkiaFullSuite -and $Action -ne 'skia-native-test') { throw 'SkiaFullSuite requires skia-native-test.' }
+if (($SkiaExpectedNativeSha256 -or $SkiaAuditResultPath) -and $Action -ne 'skia-native-test') { throw 'Skia candidate pins/audit output require skia-native-test.' }
+if ($SkiaExpectedNativeSha256 -and $SkiaExpectedNativeSha256 -notmatch '\A[A-Fa-f0-9]{64}\z') { throw 'SkiaExpectedNativeSha256 requires 64 hexadecimal characters.' }
 if ($NeuralProfile -and $Action -ne 'neural-test') { throw 'NeuralProfile requires neural-test.' }
 if (($NeuralPreviousRuntime -or $NeuralRuntimeBenchmark -or $NeuralRuntimeLifetime -or $NeuralRuntimeCancel) -and $Action -ne 'neural-test') { throw 'Neural runtime audit options require neural-test.' }
 if ($NeuralRuntimeBenchmark -and $NeuralProfile) { throw 'Neural runtime benchmark excludes profiling.' }
@@ -326,6 +329,11 @@ switch ($Action) {
             if ([string]::IsNullOrWhiteSpace($SkiaLibrary) -or [string]::IsNullOrWhiteSpace($SkiaSourceRoot)) { throw 'Specify -SkiaLibrary and -SkiaSourceRoot.' }
             $audit = [IO.Path]::GetFullPath($SkiaLibrary); $fixture = [IO.Path]::GetFullPath($SkiaSourceRoot)
             Assert-LocalTree $audit; Assert-LocalTree $fixture
+            if ($SkiaAuditResultPath) {
+                $skiaResult = [IO.Path]::GetFullPath($SkiaAuditResultPath); Assert-LocalTree $skiaResult
+                if (-not $skiaResult.StartsWith([IO.Path]::GetFullPath((Join-Path $PSScriptRoot '.local')) + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or (Test-Path -LiteralPath $skiaResult)) { throw 'Choose a new SkiaAuditResultPath below repository .local.' }
+                if (-not (Test-Path -LiteralPath (Split-Path -Parent $skiaResult) -PathType Container)) { throw 'Skia audit result parent must already exist.' }
+            }
             if (-not $isWindowsHost -or -not [IO.File]::Exists($audit) -or -not [IO.Directory]::Exists($fixture)) { throw 'Skia check requires Windows and the fixed library/source.' }
             $nativeCheck = if ($SkiaFullSuite) { '--with-skia-native' } else { '--skia-native-check' }
         } elseif ($Action -eq 'neural-reference-test') {
@@ -352,6 +360,7 @@ switch ($Action) {
         $start.WorkingDirectory = $PSScriptRoot
         $start.ArgumentList.Add($nativeCheck)
         if ($Action -ne 'neural-reference-test') { $start.ArgumentList.Add($audit); $start.ArgumentList.Add($fixture) }
+        if ($SkiaExpectedNativeSha256) { $start.ArgumentList.Add('--expected-native-sha256'); $start.ArgumentList.Add($SkiaExpectedNativeSha256) }
         if ($NeuralPreviousRuntime) { $start.ArgumentList.Add('--previous-runtime') }
         if ($NeuralRuntimeBenchmark) { $start.ArgumentList.Add('--runtime-benchmark') }
         if ($NeuralRuntimeLifetime) { $start.ArgumentList.Add('--runtime-lifetime') }
@@ -373,6 +382,12 @@ switch ($Action) {
             if ($standardOutput.Result) { Write-Output $standardOutput.Result.TrimEnd() }
             if ($standardError.Result) { throw ('Neural native check reported: ' + $standardError.Result.TrimEnd()) }
             if ($child.ExitCode -ne 0) { throw "Neural native check failed with exit code $($child.ExitCode)." }
+            if ($Action -eq 'skia-native-test' -and $SkiaAuditResultPath) {
+                $records = @($standardOutput.Result -split '\r?\n' | Where-Object { $_.StartsWith('{') -and $_.Contains('"NativeSha256"') })
+                if ($records.Count -ne 1) { throw 'Expected one exact Skia managed audit record.' }
+                $resultFile = [IO.File]::Open($skiaResult, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+                try { $resultBytes = [Text.UTF8Encoding]::new($false).GetBytes($records[0] + "`n"); $resultFile.Write($resultBytes) } finally { $resultFile.Dispose() }
+            }
         }
         finally {
             if ($started -and -not $child.HasExited) {

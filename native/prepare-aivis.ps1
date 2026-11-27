@@ -97,7 +97,7 @@ try {
         if ((Get-FileHash -LiteralPath $source).Hash -ne $correspondingSources[$name]) { throw "Unexpected Aivis corresponding source $name." }
         Copy-Item -LiteralPath $source -Destination $sourceDirectory
     }
-    $sharedNotices = Join-Path $local 'vendor/voicevox/package/licenses'
+    $sharedNotices = Join-Path $vendor 'licenses'
     $sharedLicenses = [ordered]@{
         'Eigen-source.zip' = '6a60d76351f97132669daeeB721d6bf14b008101883ad2d687a3201c5c461eb0'
         'Eigen-MPL-2.0.txt' = '66a3107d5ad6a058aab753eaac2047ccb2ed0e39465dd0fe5844da3e300d5172'
@@ -109,10 +109,10 @@ try {
         $target = if ($name.EndsWith('.zip')) { $sourceDirectory } else { Join-Path $stage 'licenses' }
         Copy-Item -LiteralPath $source -Destination $target
     }
-    foreach ($name in @('prepare-aivis.ps1', 'process-error-mode.ps1', 'aivis_worker.py')) {
+    foreach ($name in @('prepare-aivis.ps1', 'process-error-mode.ps1', 'aivis_worker.py', 'acquire-aivis-inputs.py')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $projectSource
     }
-    foreach ($name in @('package.py', 'locked_wheels.py', 'model_metadata.py', 'verify_worker.py', 'voices.json', 'wheels.json', 'NOTICE.md')) {
+    foreach ($name in @('package.py', 'locked_wheels.py', 'model_metadata.py', 'verify_worker.py', 'voices.json', 'wheels.json', 'inputs.json', 'NOTICE.md')) {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "aivis/$name") -Destination (Join-Path $projectSource 'aivis')
     }
     $template = Join-Path $PSScriptRoot 'aivis/voices.json'

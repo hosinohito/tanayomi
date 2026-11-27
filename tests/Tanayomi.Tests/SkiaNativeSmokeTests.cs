@@ -9,7 +9,7 @@ using SkiaSharp;
 
 internal static class SkiaNativeSmokeTests
 {
-    internal static int RunNativeCheck(string libraryPath, string skiaSourceRoot)
+    internal static int RunNativeCheck(string libraryPath, string skiaSourceRoot, string? expectedNativeSha256 = null)
     {
         var pins = new List<FileStream>();
         try
@@ -17,9 +17,13 @@ internal static class SkiaNativeSmokeTests
             if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("This smoke audits the Windows x64 candidate.");
             string root = Path.GetFullPath(skiaSourceRoot);
             var nativePath = Path.GetFullPath(libraryPath);
+            if (expectedNativeSha256 != null && !System.Text.RegularExpressions.Regex.IsMatch(expectedNativeSha256, "\\A[A-Fa-f0-9]{64}\\z"))
+                throw new InvalidDataException("Explicit candidate SHA256 must contain 64 hexadecimal characters.");
             pins.Add(OpenPinned(nativePath, 16 * 1024 * 1024,
-                "828EF8C611AD23EC33CA1A6581A8CFE8F0CBB45925C0AE87CFC074BAED8C2458",
-                "7DEC3BA900AB353491E6446F0083739924C6F8DD668832E2F09D38EBFFDBBE1C"));
+                expectedNativeSha256?.ToUpperInvariant() ?? "828EF8C611AD23EC33CA1A6581A8CFE8F0CBB45925C0AE87CFC074BAED8C2458",
+                expectedNativeSha256?.ToUpperInvariant() ?? "7DEC3BA900AB353491E6446F0083739924C6F8DD668832E2F09D38EBFFDBBE1C"));
+            string nativeSha256 = Convert.ToHexString(SHA256.HashData(pins[0]));
+            pins[0].Position = 0;
             string nativeDirectory = Path.GetDirectoryName(nativePath) ?? throw new InvalidDataException("Native directory missing.");
             foreach (var runtime in new Dictionary<string, string>
             {
@@ -119,7 +123,7 @@ internal static class SkiaNativeSmokeTests
             }
             // The native module remains alive until this finite worker exits, after all managed Skia objects are disposed.
             Console.WriteLine(JsonSerializer.Serialize(new { ManagedVersion = typeof(SKBitmap).Assembly.GetName().Version?.ToString() ?? "unknown",
-                ManagedPackage = "3.119.4", NativePath = nativePath, MalformedInputRejected = true, Decodes = decodes, Japanese = new { Typeface = face.FamilyName, Glyphs = glyphs.Length,
+                ManagedPackage = "3.119.4", NativePath = nativePath, NativeSha256 = nativeSha256, MalformedInputRejected = true, Decodes = decodes, Japanese = new { Typeface = face.FamilyName, Glyphs = glyphs.Length,
                     MissingGlyphs = 0, DarkPixels = dark, PixelSha256 = Hash(rendered.Bytes) }, Encodes = encodes,
                 GpuTested = false, AvaloniaTested = false }));
             return 0;

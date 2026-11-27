@@ -133,8 +133,13 @@ internal sealed class NeuralOpenVoiceAssets : IDisposable
 {
     // A successful development build does not authorize redistribution. Fill
     // these only after the native/CRT adoption decision and exact-file audit.
+#if REBUILT_OPENVOICE
+    internal const string ApprovedNativeSha256 = RebuiltOpenVoiceIdentity.Sha256;
+    internal const int ApprovedNativeBytes = RebuiltOpenVoiceIdentity.Bytes;
+#else
     internal const string ApprovedNativeSha256 = "1054ABA195985786A160E1F0220527B34734FACD5CA32D8DBEF094A53A07846C";
     internal const int ApprovedNativeBytes = 10176000;
+#endif
     internal static bool Configured => ApprovedNativeSha256.Length == 64 && ApprovedNativeBytes > 0;
     private static readonly (string Name, int Bytes, string Hash)[] RuntimeFiles =
     [

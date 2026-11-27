@@ -83,7 +83,14 @@ ONNX Runtime 1.23.2の固定source `a83fc4d58cb48eb68890dd689f94f28288cf2278`を
 
 EigenはMPL-2.0の対象ソースと表示を同梱する承認条件に従い、固定`1d8b82b0740839c0de7f1242a3585e3390ff5f33`の全ソースZIP（SHA256 `6A60D76351F97132669DAEEB721D6BF14B008101883AD2D687A3201C5C461EB0`）とMPL全文を`licenses/openvoice/`へ配置する。Eigen自体の改変はない。本体全体のMPL化を意味しない（[公式FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/)）。正規VC142 REDIST 14.29.30038.0の`msvcp140.dll`、`vcruntime140.dll`、`vcruntime140_1.dll`は未改変・署名確認済み実物をORTと同じフォルダーへ置き、上節のMicrosoft許諾文と受領者同意手順を維持する。モデル2件・native・CRTの固定size/hashは`resources/openvoice/openvoice-build.json`に含め、実行時も検査する。Skia等の別部品の未解決条件や本体ライセンスの決定を、この採用で解決済みとしない。
 
+別マシンでの再生成では、旧監査DLLのバイト列そのものを入力に要求しない。固定source・完全patch・ツール・許可するリンク部品を`native/openvoice-runtime-policy.json`、生成元検査を`native/stage-openvoice.ps1`へ固定し、その構成から生成したDLLのSHAを明示manifest経由で製品へ埋め込む。固定commitの`ThirdPartyNotices.txt`全文を保持し、旧表示の先頭に付いていた開発時説明は生成`openvoice-build.json`の由来情報と区別する。モデル・CRT・Eigenの固定SHAは変更しない。Skiaも固定source・build graph・PE/ABI/MAP・managed描画確認を通した生成物だけを明示manifestで指定する。この経路は別版の依存や未確認の公開配布を許可するものではない。
+
+ORT公式ソースの取得停止時は、`fair-acc/onnxruntime`の固定版コピーをソース取得の代替とする。監査済み原本の固定commit/treeに加え、全9,431 entryのmode・種別・pathと各blobのSHA-256から計算したダイジェスト`ec318aef4e4916adfe5c10e82090b0494b1868942a0bbe37b0fff46f0d3a140f`との一致を確認する。コピーから新しいバイナリーや変更コードを採用しない。出典・取得停止の一次記録・ダイジェスト範囲は`native/openvoice-ort-source.lock.json`に集約し、MIT全文と第三者表示は固定原本から保持する。
+
+固定開発ツールの取得元・payload SHAは`native/windows-toolchain.lock.json`。Microsoft公式VS2019 16.10.2のMSVC 14.29／Ninja／CRTをリポジトリ内へ展開し、Windows SDK 10.0.19041.0は固定公式installerから導入する。開発ツール一式は製品配布物に含めず、同梱CRTの上記許諾条件を維持する。Aivis用の許諾原本は`assets/aivis/`に独立保持し、別音声パッケージが手元にあることを取得条件にしない。各入力の取得元・SHAと原本の対応は`native/aivis/inputs.json`に記録する。
+
 ## 読み上げソフトの参考調査（非採用）
+
 
 - 2026-10-25の比較では、利用者環境に既存のUTAU付属resampler Ver14.02rを外部プロセスとして呼び出した。同梱原音の一時コピーのみを渡し、エンジンのコード・実行物はコピー／配布しない。導入済みUTAUのreadmeは配布物の全部・一部の再配布に作者許可が必要と明記しているため、同梱候補へ自動昇格しない。互換callerの公開引数仕様を参照したが、その実装コードやライブラリーは採用していない。唄詠本体・プラグインの採用許諾とは別に扱う。
   - 利用者評価後、Windows製品にも同じインストール済み実行物を使う任意の接続を追加した。外部実行のみで静的／動的リンクや再配布は行わない。検証対象exeのSHA-256は比較記録に保持し、エンジン交換時に任意の他エンジンの許諾まで承認されたとは扱わない。
@@ -285,3 +292,7 @@ VVM共通規約が許諾する再配布はアプリ組込み。生成音声を�
 ### Supertonic用ONNX Runtime許諾原本の保全
 
 固定v1.28.2のLICENSE/ThirdPartyNotices取得URLの404に備え、従来の監査済み入力と同一bytesをassets/supertonic-ort-LICENSE.txtとassets/supertonic-ort-NOTICES.txtへ保持する。prepare-supertonic.ps1の固定SHA照合を維持し、別版の条件へ置換しない。実行DLLやモデルの追加・更新ではない。
+
+### 開発専用portable Python
+
+製品には同梱しない開発入力として、Astral python-build-standaloneの20260814 release、CPython 3.12.14 Windows x64 install_only_strippedを使用する。取得URLとSHA-256は`native/build-python.lock.json`、取得・展開・venv作成は`native/prepare-build-python.ps1`。Pythonおよび同梱依存の許諾文は原archive／展開物に保持する。既存のAivis製品用Pythonとは別入力であり、これを製品へコピーしない。根拠：[公式release](https://github.com/astral-sh/python-build-standalone/releases/tag/20260814)、[配布形態の説明](https://gregoryszorc.com/docs/python-build-standalone/main/distributions.html#install-only-archive)。

@@ -22,6 +22,14 @@ ALLOW_DOWNLOAD = False
 ARCHIVE_SHA256 = {"skia-7dbfc07dd33181f84e0958afb7ee805c6c769f0b.tar.gz":"5265180696746618c344acda2916c9ad1022a0313289018197876cf2612743a9","d3d12allocator-169895d529dfce00390a20e69c2f516066fe7a3b.tar.gz":"145fd395dc97bd57dab7763f68a97de7ce745eb8d862c1b875b6f9093cff4e19","expat-f31adfd584b7f6c50bbf4d22eb928538ffc9145a.tar.gz":"595322e2a8f96a03b1cc985b34dc644f9716a7365889a1828929f782f8ea4d6e","libjpeg-turbo-927aabfcd26897abb9776ecf2a6c38ea5bb52ab6.tar.gz":"519702d4a32d8b95f7227c3b3c2011dc7a3526ea489f1a9f96b215a78e8d27c1","libpng-3061454d980de7d53608f594194cfac722721d2a.tar.gz":"a2569b7553971e36e86c8f75b9d1b5abbe92c436e05169afe3f0072e937f3536","libwebp-4fa21912338357f89e4fd51cf2368325b59e9bd9.tar.gz":"923f3382a47a2af185c3240c954cf004428b237bd7317413a95146d01eb4b94b","vulkanmemoryallocator-c788c52156f3ef7bc7ab769cb03c110a53ac8fcb.tar.gz":"7dacd2f5010f6e9c6a860d2767518b524c433912fcd38f8ff5681e6f40596c7a","spirv-cross-6e1fb9b09efadee38748e0fd0e6210d329087e89.tar.gz":"e8f175054803997c98df5270fde711b7d6d9d5434194718df5a2b8527f654e7c","vulkan-headers-7e691380166fb1cd9b193ac9db896bc23a4ea9ad.tar.gz":"a579b9449c6a8c67075ee0f4cde28b24c9b6bac5b5f41b8e350b7fee084d17a0","wuffs-e3f919ccfe3ef542cfc983a82146070258fb57f8.tar.gz":"e849dab1f372f16b782ba7528e7f70281e35425bd2d644c92a36fb95909f98db","zlib-e432200a7931de1b0b1b50201aac8a46d9380cb2.tar.gz":"f500cf5aa314c21699c692f570c7d141d0272f12703e7acb9d72cd74847a255d","gn-fe330c0ae1ec29db30b6f830e50771a335e071fb.zip":"661e1771fb3e219718df27b69bba169a32ddf134c413e19348e592c528815a60"}
 LIMIT_TRANSFER = 600 * 1024 * 1024
 LIMIT_EXPANDED = 2 * 1024 * 1024 * 1024
+# Gitiles regenerates tar metadata/compression for the same commit. These
+# manifests were derived from the SHA-256-pinned original archives above.
+# They cover every entry, including excluded tests/docs, and ignore only tar
+# timestamps, ownership and compression. Per-file Git blob checks still apply.
+ARCHIVE_CONTENT_SHA256 = {
+    "libjpeg-turbo-927aabfcd26897abb9776ecf2a6c38ea5bb52ab6.tar.gz": "b2ad361579b368872531e6b6ebe64d944d8e2766cc1481c99234b5ab0d7072b7",
+    "zlib-e432200a7931de1b0b1b50201aac8a46d9380cb2.tar.gz": "4294c9cc032cf9b0afeb6eb356f9a167aa28a391edf477e1e053cccc14903c7d",
+}
 SKIA = "7dbfc07dd33181f84e0958afb7ee805c6c769f0b"
 GN = "fe330c0ae1ec29db30b6f830e50771a335e071fb"
 # Only fixed dependencies used by the preserved Windows graphics/codecs path.
@@ -90,13 +98,43 @@ def configure_root(value, acquire_requested):
         raise ValueError("invalid acquisition budget counters")
 
 
+def archive_content_sha256(path):
+    entries = {}
+    expanded = 0
+    with tarfile.open(path, "r|gz") as archive:
+        for entry in archive:
+            if entry.name in entries:
+                raise ValueError("duplicate archive entry")
+            expanded += entry.size
+            if entry.size < 0 or expanded > LIMIT_EXPANDED:
+                raise ValueError("archive content verification exceeds expanded budget")
+            digest = hashlib.sha256()
+            if entry.isfile():
+                with archive.extractfile(entry) as source:
+                    while block := source.read(1024 * 1024):
+                        digest.update(block)
+            elif not (entry.isdir() or entry.issym()):
+                raise ValueError("unexpected archive content entry")
+            entries[entry.name] = (entry.type.decode("ascii"), entry.mode, entry.linkname, digest.hexdigest())
+    canonical = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def archive_matches(path, name, digest, expected=None):
+    wanted = ARCHIVE_SHA256.get(name, expected)
+    if wanted and digest == wanted:
+        return True
+    content_pin = ARCHIVE_CONTENT_SHA256.get(name)
+    return bool(content_pin and archive_content_sha256(path) == content_pin)
+
+
 def download(url, path, metadata=False):
     path = owned(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         expected = state["archives"].get(path.name)
-        wanted = ARCHIVE_SHA256.get(path.name, expected["sha256"] if expected else None)
-        if wanted and hashlib.sha256(path.read_bytes()).hexdigest() == wanted:
+        if archive_matches(path, path.name, hashlib.sha256(path.read_bytes()).hexdigest(),
+                           expected["sha256"] if expected else None):
             return path
         raise ValueError("existing unverified download is preserved: " + path.name)
     if not ALLOW_DOWNLOAD:
@@ -125,7 +163,7 @@ def download(url, path, metadata=False):
                     raise ValueError("metadata size limit")
                 target.write(block)
                 digest.update(block)
-        if path.name in ARCHIVE_SHA256 and digest.hexdigest() != ARCHIVE_SHA256[path.name]:
+        if path.name in ARCHIVE_SHA256 and not archive_matches(temporary, path.name, digest.hexdigest()):
             raise ValueError("fixed archive hash mismatch")
         temporary.replace(path)
         state["archives"][path.name] = {"url": url, "bytes": size, "sha256": digest.hexdigest()}
@@ -399,7 +437,8 @@ def verify():
         if hashlib.sha256(owned(ROOT / relative).read_bytes()).hexdigest() != digest:
             raise ValueError("fixed tool/license changed: " + relative)
     pins = [{"name": name, "revision": revision,
-             "archiveSha256": ARCHIVE_SHA256[name + "-" + revision + ".tar.gz"]}
+             "archiveSha256": ARCHIVE_SHA256[name + "-" + revision + ".tar.gz"],
+             "archiveContentSha256": ARCHIVE_CONTENT_SHA256.get(name + "-" + revision + ".tar.gz")}
             for name, _, revision, _ in DEPS]
     print(json.dumps({"verifiedFiles": files, "verifiedBytes": total, "sources": len(DEPS), "networkUsed": False,
                       "sourcePins": pins, "gnRevision": GN,
@@ -422,7 +461,8 @@ if __name__ == "__main__":
             verify()
         else:
             print(json.dumps({"transferLimit": LIMIT_TRANSFER, "expandedLimit": LIMIT_EXPANDED,
-                              "sources": DEPS, "gnRevision": GN, "archiveSha256": ARCHIVE_SHA256}))
+                              "sources": DEPS, "gnRevision": GN, "archiveSha256": ARCHIVE_SHA256,
+                              "archiveContentSha256": ARCHIVE_CONTENT_SHA256}))
     except Exception as error:
         print(type(error).__name__ + ": " + str(error), file=__import__("sys").stderr)
         raise SystemExit(1)

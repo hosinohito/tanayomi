@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "primary": "https://github.com/microsoft/onnxruntime.git",
+  "mirror": "https://github.com/fair-acc/onnxruntime.git",
+  "tag": "v1.23.2",
+  "commit": "a83fc4d58cb48eb68890dd689f94f28288cf2278",
+  "tree": "b5dda94ef2878d4682e18d1b0c5f150b09054f42",
+  "algorithm": "git-tree-blob-sha256-v1",
+  "canonicalSha256": "ec318aef4e4916adfe5c10e82090b0494b1868942a0bbe37b0fff46f0d3a140f",
+  "entries": 9431,
+  "gitlinks": 3,
+  "verification": "The complete HEAD mode/type/blob-OID/path listing was compared with the pre-existing adopted source checkout. Every Git blob was independently SHA-256 hashed in both repositories. Gitlinks bind their recorded commit IDs; submodule contents and later build downloads are outside this digest.",
+  "upstreamIncident": "https://github.com/onnx/onnx/issues/8842",
+  "mirrorProvenance": "https://github.com/fair-acc/gnuradio4/commit/dec1e4ac9dc066d407544092b44271072d65f9d8"
+}

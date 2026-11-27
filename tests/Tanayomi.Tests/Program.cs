@@ -91,11 +91,11 @@ internal static class Program
                 OpenVoiceReferenceComparison.RunAsync(args[1]).GetAwaiter().GetResult();
                 return 0;
             }
-            if (args.Length == 3 && args[0] == "--skia-native-check")
-                return SkiaNativeSmokeTests.RunNativeCheck(args[1], args[2]);
-            if (args.Length == 3 && args[0] == "--with-skia-native")
+            if ((args.Length == 3 || (args.Length == 5 && args[3] == "--expected-native-sha256")) && args[0] == "--skia-native-check")
+                return SkiaNativeSmokeTests.RunNativeCheck(args[1], args[2], args.Length == 5 ? args[4] : null);
+            if ((args.Length == 3 || (args.Length == 5 && args[3] == "--expected-native-sha256")) && args[0] == "--with-skia-native")
             {
-                var result = SkiaNativeSmokeTests.RunNativeCheck(args[1], args[2]);
+                var result = SkiaNativeSmokeTests.RunNativeCheck(args[1], args[2], args.Length == 5 ? args[4] : null);
                 if (result != 0) return result;
                 args = [];
             }

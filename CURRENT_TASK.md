@@ -1,51 +1,42 @@
 # 現在の作業
 
-更新日時：2026-11-27 08:57:41 +09:00。引き継ぎID：20261127-01。
-依頼一覧・優先順はPROJECT_STATUS.md。R26はユーザーの明示終了まで未完。Windows以外と公開配布は保留。
+更新日時：2026-11-27 10:15 +09:00。引き継ぎID：20261127-03。
+依頼一覧・優先順はPROJECT_STATUS.md。Windows以外・公開配布は保留。R26は明示終了まで未完。
 
-## 別PCでの Windows x64 再構築（2026-11-27）
+## 目的・完了条件
 
-構築手順更新 ef5a314 を取り込み、固定した共通ロックのまま Windows x64 publish に成功。別の開発フォルダーに準備済みだった WORLD・Open JTalk／NIT・VOICEVOX・Supertonic・Aivis／JVNV と追加HTS音声を使用した。出力はこのチェックアウトの `.local/build/app/Tanayomi.Desktop.exe`。以前の開発機の試用版と利用者データには変更なし。
+R31：旧開発PCのファイル／固定フォルダーID／Codex環境を必須にせず、取得・生成・検査からWindows x64フル機能版を構築できる手順を整備しGitHubへ反映する。対象は取得script、固定入力lock、native build/stage、full構成検査、回帰試験、README。音声の製品仕様・既存利用者data・試用版は変更しない。
 
-フル機能版の残りは、OpenVoice専用ORTと監査済みSkia。Microsoft公式ORTのタグ取得はGit認証要求で中断。固定コミットの既存ソースはあるが、専用DLLを生成・採用するには指定MSVC／Windows SDKの構成が必要。Skia本体の固定アーカイブは取得できたが、libjpeg-turboの固定アーカイブがSHA-256不一致で取得中断。いずれの検査も緩和せず、通常Skiaでビルドした。Open JTalkの製品試験85項目、Aivis／JVNV・VOICEVOX・Supertonicの製品試験129項目、UTAU製品の固定文PCM検査に合格。共通試験は、上流でも記録されていたAivisの最大PCMフレーム割り当て量テストで停止。
+## 到達点と検証
 
-## 現在の目的・到達点
+- 固定Python、MSVC/Ninja/CRT、音声入力、Aivis/JVNV許諾の取得を追加。portable MSVC3461ファイル検証、新Python/venv/pip検証成功。Windows SDKは公式固定installer取得後に利用者が導入しVerifySdkで確認する。OS全体を変更する自動導入は行わない。
+- SkiaのGitiles archive再生成差は固定展開内容で照合。新Skiaの全compile、PE/ABI/link、画像codec・日本語描画とStageが成功。
+- ORT公式取得停止には固定mirrorを追加。信頼済みsourceとの9431entry/内容SHA完全一致と新取得checkoutを検証。portable toolchainで専用ORTを新規生成、source/patch/PE/link/model/許諾をStageで照合。生成DLLは明示manifest SHAでのみ採用。
+- WORLD/Open JTalkを新規生成して固定source/member/include/flagsのpolicyを通過。Aivis割当試験の不公平な比較と現行UTAUの古い期待値を修正。
+- publish-full-windows.ps1により共通・WORLD・Open JTalk・OpenVoice native検査、全機能publish、完成exeのOpen JTalk、VOICEVOX/Supertonic/Aivis/JVNV、OpenVoice5件、UTAU波形方式の製品試験が終了コード0で完了。OpenVoiceは全件fallback 0。
+- full構成不足8ケース／生成OpenVoice identity5ケース、Python準備12、音声取得24、runtime policy22、ORT source9、Skia取得Python8のfixture成功。一時fixtureは清掃。
+- 完全に空の別Windowsマシンでの一括実行は未実施。今回のモデル変換済み入力と既存Windows SDKは固定検査済みのものを再使用し、全モデルの再変換成功を今回の結果としては主張しない。
 
-最新依頼：別マシンの固定資産取得・生成手順を整備してpushする。
-到達点：Aivis固有IDを既定入力から除去（今後このPCでも既存package-4a8ce577e6f5417b9d9e90a508e0f8c2を使うpublish時はAivisDirectoryを明示）。Supertonic許諾2件の404を再現し原本をassetsへ固定SHAのまま同梱、改行変換を.gitattributesで抑止。SkiaのVS/SDK/Ninja配置引数追加。ORT固定Git取得scriptとConfigureOnly、ローカルGit入力を追加。READMEへ順序・取得・生成・採用条件を記載。
-検証：変更script/README例の構文・全相対リンク、Supertonic補完/破損拒否、Skia Plan/環境指定、MSBuild既定/override確認。実既存ORTから新規checkout成功、元source不変・検証コピー清掃済み。公式ORT remote取得はRepository not foundで未成功。新規PC全native再build、旧VSinstaller取得、生成DLLの採用監査は未検証で完了扱いしない。
-統合確認：push時に別PCの32adeda（UTAU改善）を検出し通常mergeで保護。共通試験は不合格（初回UtauContextTests、再確認AivisPcmProtocolTestsの割当量assertion）。今回の準備script検証とは別に未解決として保持。次操作：統合記録をcommit/pushしremote一致確認。準備手順と取得経路の修正が今回範囲。製品再build/新tryoutは未作成、既存版/data不変。別PCの完全再構築は上記外部条件・監査が残る。
-容量：完了ORT col2im/fusedの再生成可能LIB/OBJ252個1,400,306,855bytesを検査後清掃。最初のpublish resources抑制は効かず容量不足、失敗したbin/resourcesのみ安全清掃してcsprojの明示metadataへ修正。再publish成功、通常buildコピー維持。旧141155版削除の個別承認ありだが、実行時に指定フォルダーが既に消えており削除せず。空き約28GBへ変化したことを観測。181159版/dataを保護して新183929版の作成・照合完了。
-前提：通常モードの長文修正は利用者が『治った』と確認済み。今回ONはその修正前を意図して選ぶ機能。品質比較の詳細はRESEARCH、履歴はWORK_LOG。
+## 成果物と再現
 
-## 最新成果物・確認範囲
+- 今回の開発フル機能exe：`.local/build/app/Tanayomi.Desktop.exe`。利用者用コピーとは別。既存最新試用版`.local/tryout/20261123-183929-66ba7f/Tanayomi.Desktop.exe`は変更なし。
+- 新WORLD：`.local/build/native-llvm/audit-20261127-094637-c9a62f02`。新Open JTalk：`.local/build/open-jtalk/audit-20261127-094152-519b9c70`。
+- 新OpenVoice Stage：`.local/build/openvoice-stage-portable-20261127`、manifest SHA `4E65C2BB2A23543C201894FAA80B2E1F3895DB16A218F9B2D62E0CB2B289D62B`。
+- 新Skia Stage：`.local/build/native-skia-portable-20261127`、manifest SHA `90C59DA4F0FBFAE0CB8C0743D05A4D9CAA76F2F7281614A724C8EAA57DCA2617`。
+- 新Aivis package：`.local/vendor/aivis/package-937084d1fdd9478fb5795ce08dee3f5f`。
+- このPCの再実行入力は`.local/build/full-windows-inputs.json`。リポジトリ直下のPowerShell 7で`$full=Get-Content .local/build/full-windows-inputs.json -Raw|ConvertFrom-Json -AsHashtable; ./publish-full-windows.ps1 @full`。これは生成記録であり他PCへコピーする入力ではない。新規環境はREADMEの取得順に従う。
 
-- 最新exe：C:/work/tanayomi/.local/tryout/20261123-183929-66ba7f/Tanayomi.Desktop.exe。間延びモード追加版、非data8189全SHA一致を確認済み。既存版/dataは保護し、非管理者の正式な利用者権限で暗号化認証と設定を引継ぎ。
-- publishと非data8189ファイル全SHA一致。core 2F6EF80F35AAC70E5FABED6FC713EF9C7C6AE2F2D842766FCCD7E8BD65A41CC4、Desktop 720A67118DA06194BC1C26E309FF39C4A0B36D8709B8EE6A169F13D7CF2F0CD6。
-- 共通2654、Aivis製品11、OpenVoice製品5文/退避0/同文再利用成功。先行VOICEVOX変更は製品104（全95声・再選択PCM一致・取消後再起動）成功。Aivis新packageは8声16PCM/上限拒否/量子化・trim対照成功。
-- 最新Aivis package：.local/vendor/aivis/package-4a8ce577e6f5417b9d9e90a508e0f8c2。JVNV再生成入力：.local/vendor/aivis/jvnv/converted-112f21b518a34650835c185115797484。原本/wheel/対応sourceを保持。
-- 新testは一度ローカル変数名衝突とエラーメッセージ期待値で失敗。変数名を変更し、既存の説明付きエラー識別子を検査するよう試験だけを訂正して再通過。製品のエラー挙動は変更していない。
+## 次操作
 
-## 次操作と注意点
+READMEの最終レビュー・Git差分確認後にソースと文書をコミットし、承認済みGitHub mainへpushしてremote一致を確認する。再ビルドは検査条件が変わった場合だけ行う。共有build/testは終了済み。
 
-- R26全体は未完。今回の採用5件は完了し、未統合差分なし。Windows標準音声のSpVoice再利用も有限監査し、OS既定音声/出力先の途中変更反映を変えるため単純保持は見送った。現在追加の採用候補は未確定。VOICEVOX/Supertonicの追加ロード削減、OpenVoice一覧wrapper、Aivis末尾ガの再解析は有限監査後に見送り。既採否を反復せず、次は新しい具体的な重複処理または再現可能な遅延根拠が必要。根拠なしの新cache/依存/品質変更を追加しない。
-- 再開時は本書と実ファイルを照合し、旧開発package66の清掃session58271は完了（3,243,383,079bytes）。共有build/test/agentは非稼働。旧e543も3,243,381,095bytes整理済み。どちらも再生成可能開発物のみで、試用版/data/原本は対象外。
-- 入口はリポジトリ直下で ./dev.ps1 test -Configuration Release、./dev.ps1 publish。対象方式の製品確認はREADMEのコマンドを使う。新規copyは ./dev.ps1 tryout、通常sandboxの認証ACL拒否には正式な利用者権限を申請し、平文退避/ACL変更はしない。
-## 保持物・有効な保留
+## 保持物・保留
 
-- 長文修正後品質基準：.local/previews/openvoice-long-phrase-20261123-090829-6467e7e7e7b5413e81436829b7422a5f/。次の基準更新まで保持。修正前085320版は再生参照終了確認後の清掃対象。
-- GitHubソースpushは今回明示承認。実行物の公開配布・本体ライセンス決定とは別。
-
-
-
-- 公開配布/本体ライセンス選択は利用者判断待ち。R19のソース提供/クレジットは承認済みで、適格モデルを実装する。禁止条件に該当する候補・許諾未確定の資産を黙って製品へ追加しない。Qwen再開禁止。
-- Twitchは利用者試験済み。投稿・再試験依頼なし。YouTubeはURLなしで実受信保留。外部VOICEVOX実ENGINE確認は方式撤回により対象外。
-- 同話者の実CVVC素材は利用者回答「なし」。再照会不要、人工検証を実素材評価としない。
-- Windows以外の環境対応タスク全体は最新指示で明示保留。他OS実機試験は行わない。Unix nativeの実build/ABI/配布監査、mobile SDK/workload/Xcode/署名は未整備。iOS無音時常時受信/Android Doze通信を保証しない。
-- 採用native：OpenVoice 1054ABA195985786A160E1F0220527B34734FACD5CA32D8DBEF094A53A07846C、WORLD 6D07EBC9B9854065A3F5428E71FF05212221449F2BD640541519D82757AC3FFF。監査の入口はREADME/THIRD_PARTY_NOTICES。col2im/fusedの限定source・監査、WORLD audit-20261027-080217-8175a433とaudit-20261027-074410-aa27613bを保護。
-- 品質基準：.local/previews/utau-devoicing-20261026-174938-ba809dc08d4443b88b657180e082ab0e/のA/B/conditions.json。B PCM7966B6CCF30AB43444453A8C8557B11EA233FA5AB803391D24F0E4027109E243を次の品質基準更新まで保持。同じ比較の再生成/質問なし。
-- Open JTalk採用監査：.local/build/open-jtalk/audit-20261123-183016-4b48d01c。DLL SHA256 200C9249E57DF9BEF944E59B083054C667A96629AA8586300B04F025B3192FD7。旧監査とのtoolchain/flags/import/export/linked-member一致を確認。採用版の由来証跡として置換監査まで保持。入口README。
-
+- 新Stage・native source/build receipt/MAP・固定取得cacheは再現と採用来歴として保持。不要になった今回の旧OpenVoice検証コピー146620283bytesは使用参照確認後に削除済み。native中間物の追加清掃は現在の採用証跡を巻き込まず行う。
+- R30試聴版・録画・比較PCMは利用者評価待ちで保護。長文OpenVoice品質基準`.local/previews/openvoice-long-phrase-20261123-090829-6467e7e7e7b5413e81436829b7422a5f/`、UTAU基準`.local/previews/utau-devoicing-20261026-174938-ba809dc08d4443b88b657180e082ab0e/`は基準更新まで保持。
+- R26の採用済み最適化は維持。追加の具体的遅延根拠／候補は未確定。既採否の反復や根拠のないcache追加はしない。
+- 本体ライセンス・実行物公開は保留。GitHubソースpushは承認済み。Qwen再開禁止。他OSの実装・監査・SDK・実機試験は明示保留。
+- Twitchは利用者試験済み。YouTube実受信はURLなし、同話者CVVC素材は「なし」で保留。再照会しない。
 ## R30 WindowsのシンプルUTAU：実機録音を基準に音程の段差を減らす（2026-11-25、引き継ぎID 20261125-11）
 
 棒読みちゃんの提供録画をローカルで計測し、付属CVの前版で母音の前半と後半が別の音程に分かれる現象を確認。発話ごとの共通音程を有声の母音頭から決め、有声区間の立ち上がりを原音の周期から共通曲線へ緩やかに接続する。旧音量補正・句の先読みは維持。句内音量を揃える案は、頭が目立つ音が増えたため不採用。

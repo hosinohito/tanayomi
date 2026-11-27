@@ -68,7 +68,7 @@ internal static class UtauContextTests
         var errors = new Exception[] { new FileNotFoundException("Missing optional WORLD asset") };
         var provider = new Tanayomi.Desktop.DesktopUtauModes(worldAvailable: false, prosodyAvailable: false, initializationErrors: errors);
         await using var portable = new UtauSpeech(new PcmProbe(), provider) { Voicebank = bank };
-        check(provider.Modes.Select(x => x.Mode).SequenceEqual(new[] { UtauSynthesisMode.Context, UtauSynthesisMode.Simple, UtauSynthesisMode.DirectPsola }) &&
+        check(provider.Modes.Select(x => x.Mode).SequenceEqual(new[] { UtauSynthesisMode.Simple, UtauSynthesisMode.Context, UtauSynthesisMode.DirectPsola }) &&
             provider.Resolve(UtauSynthesisMode.Context) is null && provider.InitializationErrors.Count == 1,
             "missing optional native assets retain legacy, simple and direct modes while keeping the initialization diagnostic");
         check((await portable.SynthesizeAsync("あい")).Samples.SequenceEqual(expected.Samples),
@@ -99,11 +99,14 @@ internal static class UtauContextTests
 
     private static async Task CheckModesAsync(Voicebank bank, Action<bool, string> check)
     {
-        var ordinary = await UtauSpeech.SynthesizeReferenceAsync("あい", bank);
+        // Simple now includes the accepted continuous-pitch renderer. Compare
+        // with the same mode without a native processor, not the legacy B oracle.
+        await using var standalone = new UtauSpeech(new PcmProbe()) { Voicebank = bank, Mode = UtauSynthesisMode.Simple };
+        var ordinary = await standalone.SynthesizeAsync("あい");
         var processor = new Processor();
         await using var voice = new UtauSpeech(new PcmProbe(), processor) { Voicebank = bank, Mode = UtauSynthesisMode.Simple };
         check((await voice.SynthesizeAsync("あい")).Samples.SequenceEqual(ordinary.Samples) && processor.Creates == 0 && processor.FlatCalls == 0,
-            "simple selection bypasses every context and WORLD stage and preserves B PCM");
+            "simple selection bypasses every context and WORLD stage and preserves standalone Simple PCM");
         var entered = Signal(); var resume = Signal();
         processor.Create = async (_, _, ct) => { entered.SetResult(); await resume.Task.WaitAsync(ct); return null; };
         voice.Mode = UtauSynthesisMode.Context;

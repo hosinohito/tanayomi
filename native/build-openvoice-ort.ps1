@@ -275,6 +275,8 @@ Invoke-OwnedBuild $taskFlags 300 'configure'
 if ($ConfigureOnly) { Write-Output 'Pinned CPU configuration and dependencies prepared; no compilation performed.'; return }
 Invoke-OwnedBuild @('--build', $taskOutput, '--config', 'Release', '--target', 'onnxruntime', '--parallel', [string]$Parallel) $BuildDeadlineSeconds 'build'
 Get-ChildItem -LiteralPath $taskOutput -Filter 'onnxruntime.dll' -Recurse -File | ForEach-Object {
+    [ordered]@{SourceCommit=$taskActual;PatchSha256=$taskExpectedPatchHash;NativeSha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash;MapSha256=(Get-FileHash -LiteralPath (Join-Path $taskOutput 'onnxruntime.map') -Algorithm SHA256).Hash;RequestSha256=(Get-FileHash -LiteralPath (Join-Path $taskOutput 'requested-build.json') -Algorithm SHA256).Hash;ExitCode=0} |
+        ConvertTo-Json | Set-Content -LiteralPath (Join-Path $taskOutput 'completed-build.json') -Encoding utf8
     [pscustomobject]@{Path=$_.FullName;Bytes=$_.Length;Sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash} | ConvertTo-Json -Compress
 }
 } finally {
