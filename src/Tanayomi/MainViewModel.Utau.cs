@@ -14,7 +14,7 @@ public sealed partial class MainViewModel
         {
             if (disposed || value is null || selectedSpeech.Utau is not { } utau || !UtauModes.Contains(value) || value.Mode == utau.Mode) return;
             utau.Mode = value.Mode; modeEdited = true;
-            Changed(); Changed(nameof(ShowDrawnOutMode));
+            Changed(); Changed(nameof(ShowDrawnOutMode)); Changed(nameof(ShowUtauVoiceTuning));
             if (UseUtau) StartSelectedPreparation();
             // Serialize small atomic saves; switching takes effect immediately.
             modeSaving = SaveUtauModeAsync(modeSaving, value.Mode);
@@ -30,7 +30,7 @@ public sealed partial class MainViewModel
             {
                 if (!modeEdited && selectedSpeech.Utau is { } utau && UtauModes.Any(x => x.Mode == mode))
                 {
-                    utau.Mode = mode; Changed(nameof(SelectedUtauMode)); Changed(nameof(ShowDrawnOutMode));
+                    utau.Mode = mode; Changed(nameof(SelectedUtauMode)); Changed(nameof(ShowDrawnOutMode)); Changed(nameof(ShowUtauVoiceTuning));
                     if (UseUtau) StartSelectedPreparation();
                 }
             }, lifetime.Token);

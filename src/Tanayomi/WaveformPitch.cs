@@ -318,7 +318,7 @@ public static class WaveformPitch
         return input;
     }
 
-    private static void BuildEnvelope(double[] magnitudes, double[] logarithms, double[] envelope, int radius)
+    internal static void BuildEnvelope(double[] magnitudes, double[] logarithms, double[] envelope, int radius)
     {
         // Neighboring windows reuse the same logarithms. Keep each window's
         // original summation order; a rolling sum would change rounding.
@@ -334,8 +334,8 @@ public static class WaveformPitch
         }
     }
 
-    // Initialized only for the phase algorithm, never from input voice data.
-    private static class PhaseTables
+    // Initialized only when a spectral algorithm is used, never from input voice data.
+    internal static class PhaseTables
     {
         internal const int Size = 2048;
         internal static readonly bool UseAvxFft = Avx.IsSupported && HasInterleavedComplexLayout();
@@ -384,7 +384,7 @@ public static class WaveformPitch
         }
     }
 
-    private static void Fft(Complex[] data, bool inverse)
+    internal static void Fft(Complex[] data, bool inverse)
     {
         if (data.Length != PhaseTables.Size) throw new ArgumentException("Invalid phase FFT size.", nameof(data));
         foreach (var (left, right) in PhaseTables.Swaps)

@@ -159,6 +159,8 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
     private bool acousticContextRendering;
     internal bool SimpleSourceAnchoredPitchEnabled { get; init; } = OperatingSystem.IsWindows() &&
         Environment.GetEnvironmentVariable("TANAYOMI_UTAU_SOURCE_ANCHORED_PITCH") != "0";
+    internal bool SimpleLegacyPitchLeadForComparison { get; init; }
+    internal bool SimpleVoicedOnsetLookback { get; init; } = true;
     internal bool SimplePitchPreserveEnergy { get; init; } =
         Environment.GetEnvironmentVariable("TANAYOMI_UTAU_PITCH_PRESERVE_ENERGY") != "0";
     private UtauTimingAllocation[]? comparisonTimingPlan;
@@ -181,6 +183,13 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         diagnosticUnit = unitIndex; diagnosticCaptureAudio = captureAudio; diagnosticConfigured = true;
     }
     public Voicebank? Voicebank { get; set; }
+    private UtauVoiceTuning voiceTuning = UtauVoiceTuning.Default;
+    private UtauVoiceTuning utteranceVoiceTuning = UtauVoiceTuning.Default;
+    public UtauVoiceTuning VoiceTuning
+    {
+        get => Volatile.Read(ref voiceTuning);
+        set => Volatile.Write(ref voiceTuning, value ?? throw new ArgumentNullException(nameof(value)));
+    }
     private int drawnOutMode;
     public bool DrawnOutMode
     {
@@ -274,6 +283,7 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
             var processor = Processor(selectedMode);
             acousticContextRendering = selectedMode == UtauSynthesisMode.Context && processor is IUtauProsodyPostprocessor;
             simpleRendering = selectedMode == UtauSynthesisMode.Simple;
+            utteranceVoiceTuning = VoiceTuning;
             legacyRendering = processor is null && !simpleRendering;
             if (processor is IUtauDirectRenderer direct)
             {
@@ -645,10 +655,11 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         var referencePeriod = legacyRendering && ApplyPitch ? ReferencePeriod(bank, aliases, ct) : 0;
         var result = new List<float>(OutputSampleRate * 4);
         var pitchTracks = simpleRendering && SimplePitchContourEnabled ?
-            CreateContinuousPitchTracks(units, reading, ReferencePeriod(bank, aliases, ct, inspectOnly: true), ct, SimpleSourceAnchoredPitchEnabled) : null;
+            CreateContinuousPitchTracks(units, reading, ReferencePeriod(bank, aliases, ct, inspectOnly: true), ct, SimpleSourceAnchoredPitchEnabled, utteranceVoiceTuning) : null;
         var previousVowel = 0;
         var previousPeriod = 0d;
         var phraseStart = 0;
+        var timbre = simpleRendering && utteranceVoiceTuning.HasTimbre ? new UtauTimbre() : null;
         var phraseEnd = 0;
         for (var i = 0; i < units.Count; i++)
         {
@@ -700,12 +711,29 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 Math.Min(advance, Math.Max(1, fadeOverlap)), voicedLead));
             if (diagnosticActive && i == diagnosticUnit)
                 unitCapture?.ObserveAppend(result, sound.Samples, advance, fadeOverlap, ct);
+            // Leave the consonant, the entire join, and the start of the vowel dry.
+            var timbreStart = Math.Min(sound.Samples.Length,
+                Math.Max(Math.Max(sound.StableStart, sound.Preutterance), advance) + OutputSampleRate / 100);
+            var timbreLength = timbre is null ? 0 : UtauTimbre.VoicedLength(sound.Samples.AsSpan(timbreStart), sound.Period);
             var activeTrack = pitchTracks?[i];
             if (activeTrack is { } track)
-                track.Pitch.Apply(sound.Samples, result.Count - advance - track.Origin, sound.Period, ct, SimplePitchPreserveEnergy, SimpleSourceAnchoredPitchEnabled);
+                track.Pitch.Apply(sound.Samples, result.Count - advance - track.Origin, sound.Period, ct, SimplePitchPreserveEnergy, SimpleSourceAnchoredPitchEnabled && SimpleLegacyPitchLeadForComparison,
+                    trackVoicedOnset: SimpleSourceAnchoredPitchEnabled && !SimpleLegacyPitchLeadForComparison,
+                    lookBackVoicedOnset: SimpleVoicedOnsetLookback);
             if (activeTrack is not null && SimpleAttackEnvelopeEnabled)
                 UtauAttackEnvelope.Attenuate(sound.Samples, sound.Preutterance,
                     reading[i].Alias is "あ" or "い" or "う" or "え" or "お" or "を");
+            if (timbreLength > 0)
+            {
+                var formantPeriod = sound.Period;
+                if (utteranceVoiceTuning.Formant != 0 && activeTrack is not null)
+                {
+                    var measuredPeriod = UtauPitch.FindPeriod(sound.Samples.AsSpan(timbreStart, timbreLength), ct);
+                    if (measuredPeriod > 0) formantPeriod = measuredPeriod;
+                }
+                timbre!.Apply(sound.Samples.AsSpan(timbreStart, timbreLength), formantPeriod, utteranceVoiceTuning,
+                    unchecked((uint)i * 2654435761u + (uint)sound.Samples.Length), ct);
+            }
             var continuousJoin = activeTrack is null && simpleRendering && SimpleVoicedJoinsEnabled && voicedLead && advance > 0 &&
                 UtauVoicedJoin.TryBlend(CollectionsMarshal.AsSpan(result)[^advance..], sound.Samples.AsSpan(0, advance),
                     previousVowel, sound.Overlap, previousPeriod, sound.Period, ct);
@@ -847,7 +875,7 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
     }
 
     private static (UtauContinuousPitch Pitch, int Origin)?[]? CreateContinuousPitchTracks(
-        List<(Mora? Sound, char Pause)> units, UtauReadingUnit[] reading, double basePeriod, CancellationToken ct, bool centerOnVoicedStarts)
+        List<(Mora? Sound, char Pause)> units, UtauReadingUnit[] reading, double basePeriod, CancellationToken ct, bool centerOnVoicedStarts, UtauVoiceTuning tuning)
     {
         if (basePeriod is < 60 or > 490 || !double.IsFinite(basePeriod)) return null;
         var tracks = new (UtauContinuousPitch Pitch, int Origin)?[units.Count];
@@ -890,7 +918,7 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                             centerPeriod = Math.Clamp(observed[observed.Count / 2], basePeriod / 1.32, basePeriod * 1.32);
                         }
                     }
-                    var track = new UtauContinuousPitch(position - origin, centerPeriod, pause == '?', ct, edges.ToArray());
+                    var track = new UtauContinuousPitch(position - origin, centerPeriod, pause == '?', ct, edges.ToArray(), tuning);
                     for (var j = first; j < i; j++) if (units[j].Sound is not null) tracks[j] = (track, origin);
                 }
                 high = false; edges.Clear();

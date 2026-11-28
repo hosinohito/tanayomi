@@ -185,6 +185,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         textLoading = LoadTextSettingsAsync();
         utauModeStore = voiceDirectory is null ? new UtauModeStore(AppPaths.DataDirectory) : null;
         modeLoading = LoadUtauModeAsync();
+        voiceTuningStore = voiceDirectory is null ? new UtauVoiceTuningStore(AppPaths.DataDirectory) : null;
+        voiceTuningLoading = LoadUtauVoiceTuningAsync();
         InitializeDrawnOutMode(voiceDirectory is null ? new OpenVoiceDrawnOutStore(AppPaths.DataDirectory) : null);
         mobile = new MobileConnectionLifecycle(mobileLifecycle, speech.SetSuspended, twitch.Stop, youtube.Stop, speech.Clear, backgroundOperation);
         if (mobileLifecycle) speech.ActivityChanged += SpeechActivityChanged;
@@ -776,7 +778,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged, IAsyncDispos
         Cleanup(CancelAuthentication);
         Cleanup(mobile.Dispose);
         await CleanupAsync(() => Task.WhenAll(twitch.Completion, youtube.Completion, authenticationTask,
-            sessionMonitor, preparation, bankPreparation, voicebanksLoading, restoreTask, forgetTask, textLoading, textSaving, modeLoading, modeSaving, volumeLoading, volumeSaving, drawnOutLoading, drawnOutSaving)).ConfigureAwait(false);
+            sessionMonitor, preparation, bankPreparation, voicebanksLoading, restoreTask, forgetTask, textLoading, textSaving, modeLoading, modeSaving, voiceTuningLoading, voiceTuningSaving, volumeLoading, volumeSaving, drawnOutLoading, drawnOutSaving)).ConfigureAwait(false);
         await CleanupAsync(() => speech.DisposeAsync().AsTask()).ConfigureAwait(false);
         Cleanup(authentication.Dispose);
         Cleanup(lifetime.Dispose);

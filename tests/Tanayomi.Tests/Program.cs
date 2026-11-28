@@ -235,6 +235,7 @@ internal static class Program
         await UtauTests.RunAsync(Check);
         await UtauModeMenuTests.RunAsync(Check);
         await UtauSimplePrefetchTests.RunAsync(Check);
+        await UtauVoiceTuningTests.RunAsync(Check);
         await UtauVoicedJoinTests.RunAsync(Check);
         await UtauContinuousPitchTests.RunAsync(Check);
         await UtauOverlapEnvelopeTests.RunAsync(Check, null);
@@ -386,6 +387,34 @@ internal static class Program
             modeSelector.SelectedItem = model.UtauModes.Single(x => x.Mode == UtauSynthesisMode.Simple);
             Dispatcher.UIThread.RunJobs();
             Check(model.SelectedUtauMode?.Mode == UtauSynthesisMode.Simple, "UTAU synthesis dropdown switches the active mode through its UI binding");
+            var tuningPanel = view.FindControl<Expander>("UtauVoiceTuningPanel")!;
+            var pitchSlider = view.FindControl<Slider>("UtauPitchSlider")!;
+            var rangeSlider = view.FindControl<Slider>("UtauRangeSlider")!;
+            Check(tuningPanel.IsVisible == model.ShowUtauVoiceTuning, "voice tuning visibility follows the selected engine");
+            if (tuningPanel.IsVisible)
+            {
+                tuningPanel.IsExpanded = true;
+                Dispatcher.UIThread.RunJobs();
+                pitchSlider.Value = 4;
+                rangeSlider.Value = 150;
+                var formantSlider = view.FindControl<Slider>("UtauFormantSlider")!;
+                var breathSlider = view.FindControl<Slider>("UtauBreathSlider")!;
+                formantSlider.Value = -45;
+                breathSlider.Value = 60;
+                Dispatcher.UIThread.RunJobs();
+                Check(model.UtauVoiceFormant == -45 && model.UtauVoiceBreath == 60,
+                    "g and B sliders update the view-model independently");
+                Check(model.UtauVoicePitch == 4 && model.UtauVoiceRange == 150, "both voice tuning sliders update the view-model");
+                view.FindControl<Button>("UtauVoiceReset")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                Dispatcher.UIThread.RunJobs();
+                Check(pitchSlider.Value == 0 && rangeSlider.Value == 100 && formantSlider.Value == 0 && breathSlider.Value == 0,
+                    "voice tuning reset restores all four slider defaults");
+                modeSelector.SelectedItem = model.UtauModes.Single(x => x.Mode == UtauSynthesisMode.PhaseVocoder);
+                Dispatcher.UIThread.RunJobs();
+                Check(!tuningPanel.IsVisible, "voice tuning panel is hidden for the other engine");
+                modeSelector.SelectedItem = model.UtauModes.Single(x => x.Mode == UtauSynthesisMode.Simple);
+                Dispatcher.UIThread.RunJobs();
+            }
             utau.IsChecked = true;
             Dispatcher.UIThread.RunJobs();
             Check(model.UseUtau && model.VoiceName.Contains("hosinohito"), "UTAU checkbox changes selected speech and displayed voice");

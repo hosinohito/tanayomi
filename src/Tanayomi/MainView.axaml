@@ -55,6 +55,32 @@
           <ComboBox ItemsSource="{Binding Voicebanks}" SelectedItem="{Binding SelectedVoicebank}" HorizontalAlignment="Stretch" PlaceholderText="取り込んだ音源" />
           <TextBlock Text="UTAUの合成方式" />
           <ComboBox x:Name="UtauModeSelector" ItemsSource="{Binding UtauModes}" SelectedItem="{Binding SelectedUtauMode}" HorizontalAlignment="Stretch" IsEnabled="{Binding UtauAvailable}" />
+          <Expander x:Name="UtauVoiceTuningPanel" Header="声の調整" IsVisible="{Binding ShowUtauVoiceTuning}" HorizontalAlignment="Stretch">
+            <StackPanel Spacing="8" Margin="0,8,0,0">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <TextBlock Text="声の高さ" VerticalAlignment="Center" />
+                <Slider x:Name="UtauPitchSlider" Grid.Column="1" Minimum="-6" Maximum="6" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding UtauVoicePitch, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding UtauVoicePitchLabel}" VerticalAlignment="Center" MinWidth="50" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <TextBlock Text="抑揚の幅" VerticalAlignment="Center" />
+                <Slider x:Name="UtauRangeSlider" Grid.Column="1" Minimum="0" Maximum="200" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding UtauVoiceRange, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding UtauVoiceRangeLabel}" VerticalAlignment="Center" MinWidth="50" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <TextBlock Text="声の太さ（g）" VerticalAlignment="Center" />
+                <Slider x:Name="UtauFormantSlider" Grid.Column="1" Minimum="-100" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding UtauVoiceFormant, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding UtauVoiceFormantLabel}" VerticalAlignment="Center" MinWidth="50" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <TextBlock Text="息っぽさ（B）" VerticalAlignment="Center" />
+                <Slider x:Name="UtauBreathSlider" Grid.Column="1" Minimum="0" Maximum="100" TickFrequency="5" IsSnapToTickEnabled="True" Value="{Binding UtauVoiceBreath, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding UtauVoiceBreathLabel}" VerticalAlignment="Center" MinWidth="50" />
+              </Grid>
+              <TextBlock Text="次の発言から反映。太さは左で細く、右で太くなります。息っぽさは右ほど母音に息が混ざります。" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+              <Button x:Name="UtauVoiceReset" Content="既定値に戻す" Click="ResetUtauVoiceTuning" HorizontalAlignment="Left" />
+            </StackPanel>
+          </Expander>
           <StackPanel IsVisible="{Binding ShowDrawnOutMode}" Spacing="6">
             <CheckBox x:Name="DrawnOutModeToggle" Content="間延びモード" IsChecked="{Binding DrawnOutMode, Mode=TwoWay}" />
             <TextBlock Text="次に合成する発言から、長文が間延びする従来の読み方を使います。" Classes="muted" FontSize="12" TextWrapping="Wrap" />

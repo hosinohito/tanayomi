@@ -64,6 +64,7 @@ public sealed partial class UtauSpeech
             token.ThrowIfCancellationRequested();
             Volatile.Write(ref synthesisStarted, 1);
             simpleRendering = true;
+            utteranceVoiceTuning = VoiceTuning;
             legacyRendering = acousticContextRendering = false;
             var started = Stopwatch.GetTimestamp();
             var reading = await Task.Run(() => ReadSimpleOrStandard(text, token), token)

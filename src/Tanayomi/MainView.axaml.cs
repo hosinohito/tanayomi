@@ -8,6 +8,10 @@ namespace Tanayomi;
 public partial class MainView : UserControl
 {
     public MainView() => InitializeComponent();
+    private void ResetUtauVoiceTuning(object? sender, RoutedEventArgs args)
+    {
+        if (DataContext is MainViewModel model) model.ResetUtauVoiceTuning();
+    }
     private async void AuthenticateTwitch(object? sender, RoutedEventArgs args) =>
         await RunUiAsync(DiagnosticOperation.TwitchAuthentication, async model =>
     {

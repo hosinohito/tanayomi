@@ -105,7 +105,25 @@ internal static class UtauContinuousPitchTests
         }
         const string probeText = "たのさがふ。";
         var oldSource = await SourceAnchorProbe(false);
+        var priorSource = await SourceAnchorProbe(true, legacyLead: true);
+        var previousOnset = await SourceAnchorProbe(true, lookback: false);
         var newSource = await SourceAnchorProbe(true);
+        check(previousOnset.Samples.Length == newSource.Samples.Length &&
+            previousOnset.Samples.AsSpan(0, Rate * 45 / 1000).SequenceEqual(newSource.Samples.AsSpan(0, Rate * 45 / 1000)),
+            "lookback keeps the unvoiced start and total duration in たのさがふ");
+        double EarlyHz(PcmAudio pcm, int atMs)
+        {
+            var span = pcm.Samples.AsSpan(atMs * Rate / 1000, Rate * 19 / 1000);
+            var data = Array.ConvertAll(span.ToArray(), x => x / 32768f);
+            var periodAt = UtauPitch.FindPeriod(data, default);
+            return periodAt > 0 ? Rate / periodAt : 0;
+        }
+        double HeadPower(PcmAudio pcm)
+        {
+            double power = 0;
+            foreach (var sample in pcm.Samples.AsSpan(0, Rate * 19 / 1000)) power += (double)sample * sample;
+            return power;
+        }
         check(oldSource.Samples.Length == newSource.Samples.Length, "source-anchored pitch leaves PCM duration unchanged");
         var oldEarly = Hertz(oldSource, Rate * 55 / 1000);
         var oldLate = Hertz(oldSource, Rate * 155 / 1000);
@@ -114,17 +132,57 @@ internal static class UtauContinuousPitchTests
         check(oldEarly > 0 && oldLate > 0 && newEarly > 0 && newLate > 0 &&
             Math.Abs(newLate - newEarly) < Math.Abs(oldLate - oldEarly) * 0.55,
             $"first-vowel pitch discontinuity is reduced ({oldEarly:F0}→{oldLate:F0} vs {newEarly:F0}→{newLate:F0} Hz)");
-        async Task<PcmAudio> SourceAnchorProbe(bool enabled)
+        double StepFromSustain(PcmAudio pcm, int earlyMs, int lateMs)
         {
-            await using var speaker = new UtauSpeech(new NullPcm())
+            var early = Hertz(pcm, Rate * earlyMs / 1000);
+            var late = Hertz(pcm, Rate * lateMs / 1000);
+            return early > 0 && late > 0 ? Math.Abs(late - early) : double.PositiveInfinity;
+        }
+        var priorTa = StepFromSustain(priorSource, 55, 155);
+        var revisedTa = StepFromSustain(newSource, 55, 155);
+        check(double.IsFinite(priorTa) && priorTa >= 25 && revisedTa <= 10,
+            $"ta voiced onset now follows the phrase target (onset-to-sustain difference {priorTa:F0} → {revisedTa:F0} Hz)");
+        var priorGa = StepFromSustain(priorSource, 3 * 180 + 55, 3 * 180 + 155);
+        var revisedGa = StepFromSustain(newSource, 3 * 180 + 55, 3 * 180 + 155);
+        check(double.IsFinite(priorGa) && revisedGa <= 5 && revisedGa < priorGa,
+            $"ga voiced onset no longer holds a separate pitch (onset-to-sustain difference {priorGa:F0} → {revisedGa:F0} Hz)");
+        check(priorSource.Samples.AsSpan(0, Rate * 12 / 1000).SequenceEqual(newSource.Samples.AsSpan(0, Rate * 12 / 1000)),
+            "the leading unvoiced attack is unchanged");
+        async Task<PcmAudio> SourceAnchorProbe(bool enabled, bool legacyLead = false, bool lookback = true, string text = probeText)
+        {
+            var sink = new NullPcm();
+            await using var speaker = new UtauSpeech(sink)
             {
                 Voicebank = bank, Mode = UtauSynthesisMode.Simple, SimplePitchContourEnabled = true,
                 SimplePitchPreserveEnergy = true, SimpleSourceAnchoredPitchEnabled = enabled,
+                SimpleLegacyPitchLeadForComparison = legacyLead, SimpleVoicedOnsetLookback = lookback, SimplePrefetchEnabled = true,
                 SimpleLexicalAccentEnabled = true, SimpleComplementaryEnvelopeEnabled = true,
                 SimpleAttackEnvelopeEnabled = true, SimpleLeadHandoffEnabled = true
             };
-            return await speaker.SynthesizeAsync(probeText);
+            await speaker.SpeakAsync(text, default);
+            return new PcmAudio(sink.Parts.Single(), Rate);
         }
+        foreach (var text in new[] { "あいうえお。", "なにぬねの。" })
+        {
+            var previous = await SourceAnchorProbe(true, lookback: false, text: text);
+            var revised = await SourceAnchorProbe(true, text: text);
+            var oldHead = EarlyHz(previous, 0);
+            var head = EarlyHz(revised, 0);
+            var later = EarlyHz(revised, 55);
+            var gain = 10 * Math.Log10(HeadPower(revised) / HeadPower(previous));
+            check(oldHead == 0 && head > 0 && Math.Abs(head - later) < 10 &&
+                previous.Samples.Length == revised.Samples.Length,
+                $"lookback earlier confirmed pitch {text}: {head:F0} Hz in first 19 ms, {later:F0} Hz later");
+            check(Math.Abs(gain) < 2.5, $"lookback onset energy stays bounded {text}: {gain:F2} dB");
+        }
+        var noise = new Random(42);
+        var onsetInput = new float[220 * 12];
+        for (var i = 0; i < onsetInput.Length; i++)
+            onsetInput[i] = i < 880 ? (float)(noise.NextDouble() - 0.5) * 0.06f : (float)(Math.Sin(2 * Math.PI * i / 220) * 0.14);
+        var refined = UtauContinuousPitch.BacktrackVoicedOnset(onsetInput, 1100, 0, 220);
+        check(refined is >= 855 and <= 954, "lookback locates the first periodic cycle without extending into noise");
+        check(UtauContinuousPitch.BacktrackVoicedOnset(onsetInput, 1100, 1060, 220) >= 1060,
+            "lookback cannot overwrite a preceding detected run");
         const string longText = "あいうえお。きっと、またあえるよ。おはよう、今日はここまで来たの？";
         var outA = new NullPcm(); var outB = new NullPcm();
         await using var whole = Speaker(bank, true, outA, false);
