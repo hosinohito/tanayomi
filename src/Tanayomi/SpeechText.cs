@@ -19,8 +19,10 @@ public sealed class SpeechTextSettings
 {
     public const int MaximumRules = 128;
     public const int MaximumRuleScalars = 128;
+    public const int MaximumBodyPatterns = 16;
     public static SpeechTextSettings Default { get; } = new();
     public NameReadingMode NameReading { get; }
+    public bool NameAfterBody { get; }
     public bool RomajiNames { get; }
     public bool RomajiBody { get; }
     public bool SuppressRepeatedMessages { get; }
@@ -29,6 +31,8 @@ public sealed class SpeechTextSettings
     public IReadOnlyList<SpeechNameReading> NameReadings { get; }
     public IReadOnlyList<SpeechReplacement> Replacements { get; }
     public IReadOnlyList<SpeechAuthor> MutedAuthors { get; }
+    public IReadOnlyList<string> MutedBodyPatterns { get; }
+    private readonly Regex[] mutedBodyMatchers;
     private readonly Dictionary<(string Platform, string AuthorId), string> namesById = new();
     private readonly HashSet<(string Platform, string AuthorId)> mutedById = new();
     internal IReadOnlyList<SpeechReplacement> OrderedReplacements { get; }
@@ -38,10 +42,12 @@ public sealed class SpeechTextSettings
     public SpeechTextSettings(NameReadingMode nameReading = NameReadingMode.Off,
         IEnumerable<SpeechNameReading>? nameReadings = null, IEnumerable<SpeechReplacement>? replacements = null,
         IEnumerable<SpeechAuthor>? mutedAuthors = null, bool romajiNames = false, bool romajiBody = false,
-        bool suppressRepeatedMessages = false, bool omitUrls = false, int? bodyLimit = null)
+        bool suppressRepeatedMessages = false, bool omitUrls = false, int? bodyLimit = null,
+        IEnumerable<string>? mutedBodyPatterns = null, bool nameAfterBody = false)
     {
         if (!Enum.IsDefined(nameReading)) throw new ArgumentException("名前読みの設定が不正です。", nameof(nameReading));
         NameReading = nameReading;
+        NameAfterBody = nameAfterBody;
         if (bodyLimit is < 1 or > SpeechText.MaximumSpokenScalars)
             throw new ArgumentOutOfRangeException(nameof(bodyLimit));
         BodyLimit = bodyLimit;
@@ -68,8 +74,37 @@ public sealed class SpeechTextSettings
         NameReadings = Array.AsReadOnly(names);
         Replacements = Array.AsReadOnly(words);
         MutedAuthors = Array.AsReadOnly(muted);
+        var patterns = mutedBodyPatterns?.Take(MaximumBodyPatterns + 1).ToArray() ?? [];
+        if (patterns.Length > MaximumBodyPatterns)
+            throw new ArgumentException("本文の除外パターンは16件までです。", nameof(mutedBodyPatterns));
+        MutedBodyPatterns = Array.AsReadOnly(patterns);
+        mutedBodyMatchers = new Regex[patterns.Length];
+        for (var i = 0; i < patterns.Length; i++)
+        {
+            try
+            {
+                Validate(patterns[i], allowEmpty: false);
+                mutedBodyMatchers[i] = new Regex(patterns[i],
+                    RegexOptions.NonBacktracking | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(10));
+            }
+            catch (Exception error) when (error is ArgumentException or NotSupportedException)
+            {
+                throw new ArgumentException($"本文の除外パターン {i + 1} 件目を確認してください。128文字までで、先読み・後読みや後方参照は使えません。",
+                    nameof(mutedBodyPatterns), error);
+            }
+        }
         // LINQ ordering is stable: equal-length duplicates retain input order.
         OrderedReplacements = Array.AsReadOnly(words.OrderByDescending(x => x.Key.EnumerateRunes().Count()).ToArray());
+    }
+
+    internal bool IsBodyMuted(string text)
+    {
+        foreach (var matcher in mutedBodyMatchers)
+        {
+            try { if (matcher.IsMatch(text)) return true; }
+            catch (RegexMatchTimeoutException) { /* A slow rule must not discard the message. */ }
+        }
+        return false;
     }
 
     private static T[] Copy<T>(IEnumerable<T>? source) where T : class
@@ -123,7 +158,9 @@ public sealed class SpeechText(SpeechTextSettings? settings = null)
         (string Platform, string AuthorId) identity = default;
         var identified = !isManual && TryIdentity(platform, authorId, out identity);
         if (identified && snapshot.IsMuted(identity)) return new("", true, false);
-        var body = Replace(NormalizeText(text, snapshot.OmitUrls));
+        ValidateInputLength(text);
+        if (snapshot.IsBodyMuted(text)) return new("", true, false);
+        var body = Replace(NormalizeValidatedText(text, snapshot.OmitUrls));
         body = NormalizeWhitespace(body);
         if (body.Length == 0) return new("", false, false);
         var clipped = false;
@@ -137,22 +174,49 @@ public sealed class SpeechText(SpeechTextSettings? settings = null)
             var name = custom ? reading : author;
             name = NormalizeText(name ?? "");
             if (!custom && snapshot.RomajiNames) name = RomajiReading.Convert(name);
-            if (name.Length != 0) body = name + "、" + body;
+            if (name.Length != 0)
+            {
+                if (snapshot.NameAfterBody)
+                {
+                    // Reserve room for the name even when the body fills the reading limit.
+                    name = Prefix(name, MaximumSpokenScalars - 2, out var nameClipped);
+                    var endingBody = Prefix(body, MaximumSpokenScalars - 1 - name.EnumerateRunes().Count(), out var bodyClipped);
+                    return new(endingBody + (clipped || bodyClipped ? Omission : "") + "、" + name +
+                        (nameClipped ? Omission : ""), false, clipped || bodyClipped || nameClipped)
+                    {
+                        SameSpeakerText = SameSpeaker(plain, identified, clipped)
+                    };
+                }
+                body = name + "、" + body;
+            }
         }
         var limited = Prefix(body, MaximumSpokenScalars, out var totalClipped);
         return new(limited + (clipped || totalClipped ? Omission : ""), false, clipped || totalClipped)
         {
-            SameSpeakerText = identified && snapshot.NameReading == NameReadingMode.OnSpeakerChange
-                ? (clipped ? plain + Omission : Truncate(plain)) : null
+            SameSpeakerText = SameSpeaker(plain, identified, clipped)
         };
     }
+
+    private string? SameSpeaker(string body, bool identified, bool clipped) =>
+        identified && snapshot.NameReading == NameReadingMode.OnSpeakerChange
+            ? (clipped ? body + Omission : Truncate(body)) : null;
 
     public static string NormalizeText(string text, bool omitUrls = false)
     {
         ArgumentNullException.ThrowIfNull(text);
+        ValidateInputLength(text);
+        return NormalizeValidatedText(text, omitUrls);
+    }
+
+    private static void ValidateInputLength(string text)
+    {
         var count = 0;
         foreach (var rune in text.EnumerateRunes())
             if (++count > MaximumInputScalars) throw new ArgumentException("読み上げ入力が長すぎます。", nameof(text));
+    }
+
+    private static string NormalizeValidatedText(string text, bool omitUrls)
+    {
         // Preserve the established URL boundary: HTTP(S) through the next
         // whitespace, including adjacent punctuation, is replaced with リンク
         // or omitted by explicit choice. This does not fetch or expand links.

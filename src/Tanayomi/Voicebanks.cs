@@ -9,6 +9,7 @@ public sealed record OtoEntry(string WavePath, string Alias, double Offset, doub
 public sealed record Voicebank(string Name, string Directory, IReadOnlyList<OtoEntry> Entries, int RejectedEntries)
 {
     public IReadOnlyList<VoicebankPitchMapping> PitchMappings { get; init; } = Array.Empty<VoicebankPitchMapping>();
+    internal IReadOnlyDictionary<string, float>? RegisteredPeakGains { get; init; }
     public bool PitchMappingsRejected { get; init; }
     public DiagnosticException PitchMappingException { get; init; }
     public override string ToString() => $"{Name} · {Entries.Count}音";
@@ -210,12 +211,13 @@ public static class Voicebanks
             var bankFolder = ImportedBankRoot(staging, iniFiles);
             var bank = Read(bankFolder, ct);
             if (bank.RejectedEntries > 0) throw new InvalidDataException($"音源に読み込めない項目が{bank.RejectedEntries}件あります。");
+            UtauRegisteredPeaks.Attach(bank, ct, replace: true);
             var name = bankFolder == staging ? "voicebank" : bank.Name;
             if (name.StartsWith('.')) name = "voicebank";
             var target = Path.Combine(root, name);
             if (System.IO.Directory.Exists(target)) target += "-" + Guid.NewGuid().ToString("N")[..8];
             System.IO.Directory.Move(bankFolder, target);
-            return Read(target, ct);
+            return UtauRegisteredPeaks.Attach(Read(target, ct), ct);
         }
         finally
         {
@@ -275,7 +277,7 @@ public static class Voicebanks
         {
             try
             {
-                var bank = Read(directory); banks.Add(bank);
+                var bank = UtauRegisteredPeaks.Attach(Read(directory), default); banks.Add(bank);
                 if (bank.PitchMappingsRejected)
                 {
                     PublishDiagnostic(diagnostic, new(DiagnosticCode.VoicebankPitchMappingRejected,

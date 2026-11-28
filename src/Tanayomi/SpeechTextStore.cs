@@ -8,7 +8,8 @@ public sealed class SpeechTextStore(string dataDirectory)
     // One supplementary scalar can require two six-byte JSON escapes. Allow
     // every validated field at its limit plus bounded property/document overhead.
     private const int MaximumBytes = SpeechTextSettings.MaximumRules *
-        (7 * SpeechTextSettings.MaximumRuleScalars * 12 + 256) + 1024;
+        (7 * SpeechTextSettings.MaximumRuleScalars * 12 + 256) +
+        SpeechTextSettings.MaximumBodyPatterns * (SpeechTextSettings.MaximumRuleScalars * 12 + 4) + 1024;
     private readonly string root = Path.GetFullPath(dataDirectory);
     private readonly SemaphoreSlim gate = new(1, 1);
     private string SettingsPath => Path.Combine(root, "settings", "speech-text.json");
@@ -31,7 +32,7 @@ public sealed class SpeechTextStore(string dataDirectory)
             if (document.Version != 1 || document.Names is null || document.Replacements is null || document.Muted is null)
                 throw new InvalidDataException("文字列設定の形式が不正です。");
             return new SpeechTextSettings(document.NameReading, document.Names, document.Replacements, document.Muted,
-                document.RomajiNames, document.RomajiBody, document.SuppressRepeatedMessages, document.OmitUrls, document.BodyLimit);
+                document.RomajiNames, document.RomajiBody, document.SuppressRepeatedMessages, document.OmitUrls, document.BodyLimit, document.MutedBodyPatterns, document.NameAfterBody);
         }
         finally { gate.Release(); }
     }
@@ -40,7 +41,7 @@ public sealed class SpeechTextStore(string dataDirectory)
     {
         var document = new Document(1, settings.NameReading, settings.NameReadings.ToArray(),
             settings.Replacements.ToArray(), settings.MutedAuthors.ToArray(), settings.RomajiNames, settings.RomajiBody,
-            settings.SuppressRepeatedMessages, settings.OmitUrls, settings.BodyLimit);
+            settings.SuppressRepeatedMessages, settings.OmitUrls, settings.BodyLimit, settings.MutedBodyPatterns.ToArray(), settings.NameAfterBody);
         var bytes = JsonSerializer.SerializeToUtf8Bytes(document);
         if (bytes.Length > MaximumBytes) throw new InvalidDataException("文字列設定が大きすぎます。");
         await gate.WaitAsync(ct).ConfigureAwait(false);
@@ -77,5 +78,5 @@ public sealed class SpeechTextStore(string dataDirectory)
 
     private sealed record Document(int Version, NameReadingMode NameReading, SpeechNameReading[] Names,
         SpeechReplacement[] Replacements, SpeechAuthor[] Muted, bool RomajiNames = false, bool RomajiBody = false,
-        bool SuppressRepeatedMessages = false, bool OmitUrls = false, int? BodyLimit = null);
+        bool SuppressRepeatedMessages = false, bool OmitUrls = false, int? BodyLimit = null, string[]? MutedBodyPatterns = null, bool NameAfterBody = false);
 }

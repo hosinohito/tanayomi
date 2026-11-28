@@ -82,6 +82,7 @@ internal sealed record UtauJoinObservation(int UnitIndex, string PreviousAlias, 
     int IncomingMinimumOffsetSamples, double IncomingMinimumRms,
     double BeforeOnsetRms, double AfterOnsetRms);
 internal sealed record UtauJoinReview(PcmAudio Audio, IReadOnlyList<UtauJoinObservation> Joins);
+internal sealed record UtauSpectralJoin(int Start, int Overlap, string Alias, float[] Prior, float[] Incoming);
 // Opt-in numeric diagnostics. Source landmarks are absolute original-WAV
 // samples; grain source positions are relative to TrimmedStartSample. Output
 // grain/window positions are relative to this unit's rendered segment start.
@@ -146,6 +147,7 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
     private List<UtauRenderedTiming>? renderedTiming;
     private int?[]? comparisonLeadingSamples;
     private List<UtauJoinObservation>? joinObservations;
+    private List<UtauSpectralJoin>? spectralJoinReview;
     private int comparisonMoraDurationMilliseconds = 180;
     private bool comparisonCarryPureVowels;
     internal bool ShortUnvoicedReleaseForComparison { get; init; }
@@ -161,6 +163,8 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         Environment.GetEnvironmentVariable("TANAYOMI_UTAU_SOURCE_ANCHORED_PITCH") != "0";
     internal bool SimpleLegacyPitchLeadForComparison { get; init; }
     internal bool SimpleVoicedOnsetLookback { get; init; } = true;
+    internal bool SimpleMouthContourEnabled { get; init; } = true;
+    internal bool SimpleSilentTailEnabled { get; init; } = true;
     internal bool SimplePitchPreserveEnergy { get; init; } =
         Environment.GetEnvironmentVariable("TANAYOMI_UTAU_PITCH_PRESERVE_ENERGY") != "0";
     private UtauTimingAllocation[]? comparisonTimingPlan;
@@ -516,6 +520,37 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         return new(audio, Array.AsReadOnly(joins.ToArray()));
     }
 
+    internal static async Task<(PcmAudio Audio, IReadOnlyList<UtauSpectralJoin> Joins)> SynthesizeSpectralJoinReviewAsync(
+        string text, Voicebank bank, CancellationToken ct)
+    {
+        var joins = new List<UtauSpectralJoin>();
+        await using var speaker = new UtauSpeech(new ReferenceOutput())
+        {
+            Voicebank = bank, Mode = UtauSynthesisMode.Simple, SimplePitchContourEnabled = true,
+            SimpleSourceAnchoredPitchEnabled = true, SimpleComplementaryEnvelopeEnabled = true,
+            SimpleRetunedVoicedJoinEnabled = true, SimpleContextRhythmEnabled = false,
+            spectralJoinReview = joins
+        };
+        var pcm = await speaker.SynthesizeAsync(text, ct).ConfigureAwait(false);
+        return (pcm, joins.AsReadOnly());
+    }
+
+    internal static async Task<(PcmAudio Audio, IReadOnlyList<UtauTimingAnchor> Anchors)> SynthesizeLevelReviewAsync(
+        string text, Voicebank bank, CancellationToken ct, UtauVoiceTuning? tuning = null)
+    {
+        var anchors = new List<UtauTimingAnchor>();
+        await using var speaker = new UtauSpeech(new ReferenceOutput())
+        {
+            Voicebank = bank, Mode = UtauSynthesisMode.Simple, SimplePitchContourEnabled = true,
+            SimpleSourceAnchoredPitchEnabled = true, SimpleComplementaryEnvelopeEnabled = true,
+            SimpleRetunedVoicedJoinEnabled = true, SimpleContextRhythmEnabled = false,
+            VoiceTuning = tuning ?? UtauVoiceTuning.Default,
+            timingAnchors = anchors
+        };
+        var pcm = await speaker.SynthesizeAsync(text, ct).ConfigureAwait(false);
+        return (pcm, anchors.AsReadOnly());
+    }
+
     private sealed class ReferenceOutput : IPcmOutput
     {
         public Task PlayAsync(ReadOnlyMemory<short> samples, int sampleRate, CancellationToken cancellationToken) =>
@@ -550,16 +585,18 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
             var end = offsets.BinarySearch(token.Offset + token.Reading.Length);
             // Unknowns, mismatches and collapsed long-vowel placements retain
             // the existing continuous contour, rather than guessing an accent.
-            if (first < 0 || end <= first || end - first != token.MoraCount ||
+            // A dictionary fragment inside an unsegmented hiragana run is
+            // not enough evidence for a new accent phrase (e.g. よみ in a name).
+            if (token.IsEmbeddedKana || first < 0 || end <= first || end - first != token.MoraCount ||
                 !plan.Reading.AsSpan(token.Offset, token.Reading.Length).SequenceEqual(token.Reading.AsSpan())) continue;
             if (Enumerable.Range(first, end - first).Any(j => units[j].Pause != '\0' || units[j].Extensions != 0)) continue;
             var highFrom = token.Drop == 1 ? first : first + 1;
             var highTo = token.Drop == 0 ? end : first + token.Drop;
-            // Let the ending particle of a flat noun remain high. Don't
-            // infer attachment for an arbitrary following word.
-            if (token.Drop == 0 && end < units.Length &&
-                (end + 1 == units.Length || units[end + 1].Pause is '。' or '、' or '?') &&
-                units[end].Alias is "が" or "を" or "の" or "に" or "は" or "も") highTo++;
+            // Attach a recognized, one-mora particle to the preceding head
+            // even mid-sentence. Do not attach the first kana of another word.
+            if (token.Drop == 0 && token.HasFollowingParticle && end < units.Length &&
+                units[end].Pause == '\0' && units[end].Extensions == 0 &&
+                units[end].Alias is "が" or "を" or "の" or "に" or "わ" or "は" or "も") highTo++;
             for (var i = highFrom; i < highTo; i++) units[i] = units[i] with { LexicalHigh = true };
         }
         return units;
@@ -610,6 +647,9 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 unit.Extensions != plan[index].Extensions).Any()))
             throw new InvalidDataException("時間計画と音源の読みが一致しません。");
         var aliases = preparedAliases ?? Aliases(bank);
+        var rhythmOffsets = simpleRendering && SimpleContextRhythmEnabled && comparisonTimingPlan is null
+            ? UtauSimpleRhythm.Plan(reading, unit => CanRetimeStableTail(InspectMoraSource(bank, aliases[unit.Alias!], ct), ct), ct)
+            : null;
         var units = new List<(Mora? Sound, char Pause)>();
         var contextFriction = acousticContextRendering && !DisableContextFrictionForComparison;
         var contextDeclined = contextFriction ? new Dictionary<int, string>() : null;
@@ -631,7 +671,11 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 if (!retainFriction) contextDeclined[unitIndex] = reason;
             }
             var landmark = comparisonLandmarks is not null && comparisonLandmarks.TryGetValue(unitIndex, out var item) ? item : null;
-            try { segment = RenderMora(bank, oto, unit.Extensions, ct, comparisonTimingPlan?[unitIndex].DurationSamples, landmark,
+            var rhythmOffset = rhythmOffsets?[unitIndex] ?? 0;
+            int? duration = comparisonTimingPlan?[unitIndex].DurationSamples;
+            if (rhythmOffset != 0 && duration is null)
+                duration = SourcePosition(comparisonMoraDurationMilliseconds + unit.Extensions * 160.0) + rhythmOffset;
+            try { segment = RenderMora(bank, oto, unit.Extensions, ct, duration, landmark,
                 comparisonLeadingSamples?[unitIndex] ?? comparisonTimingPlan?[unitIndex].LeadingSamples, capture, retainFriction, retainNextSource: contextDeclined is not null && unitIndex > 0 && CanCompareContextFriction(unitIndex - 1, reading, out _)); }
             catch (UtauTimingPlanException error) { throw new UtauTimingPlanException(unitIndex, error.RequestedSamples, error.MinimumSamples); }
             var retainedArray = segment.FrictionSource?.Samples ?? segment.NextSource?.Inspection.Samples;
@@ -661,6 +705,8 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         var phraseStart = 0;
         var timbre = simpleRendering && utteranceVoiceTuning.HasTimbre ? new UtauTimbre() : null;
         var phraseEnd = 0;
+        var mouthShape = simpleRendering && utteranceVoiceTuning.LevelJoins && SimpleMouthContourEnabled;
+        var mouthAnchors = mouthShape ? new List<UtauTimingAnchor>() : null;
         for (var i = 0; i < units.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
@@ -671,6 +717,7 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 if (comparisonTimingPlan is { } timings) AddSilenceSamples(result, timings[i].DurationSamples);
                 else AddSilence(result, pause == 'っ' ? 85 : 110);
                 timingAnchors?.Add(new(i, null, pause, 0, pauseStart, null, result.Count));
+                mouthAnchors?.Add(new(i, null, pause, 0, pauseStart, null, result.Count));
                 previousVowel = 0; previousPeriod = 0; continue;
             }
             if (i >= phraseEnd)
@@ -720,7 +767,8 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 track.Pitch.Apply(sound.Samples, result.Count - advance - track.Origin, sound.Period, ct, SimplePitchPreserveEnergy, SimpleSourceAnchoredPitchEnabled && SimpleLegacyPitchLeadForComparison,
                     trackVoicedOnset: SimpleSourceAnchoredPitchEnabled && !SimpleLegacyPitchLeadForComparison,
                     lookBackVoicedOnset: SimpleVoicedOnsetLookback);
-            if (activeTrack is not null && SimpleAttackEnvelopeEnabled)
+            var levelJoins = simpleRendering && utteranceVoiceTuning.LevelJoins;
+            if (activeTrack is not null && SimpleAttackEnvelopeEnabled && !levelJoins)
                 UtauAttackEnvelope.Attenuate(sound.Samples, sound.Preutterance,
                     reading[i].Alias is "あ" or "い" or "う" or "え" or "お" or "を");
             if (timbreLength > 0)
@@ -734,10 +782,37 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                 timbre!.Apply(sound.Samples.AsSpan(timbreStart, timbreLength), formantPeriod, utteranceVoiceTuning,
                     unchecked((uint)i * 2654435761u + (uint)sound.Samples.Length), ct);
             }
+            if (levelJoins && bank.RegisteredPeakGains is { } peaks &&
+                peaks.TryGetValue(aliases[reading[i].Alias!].WavePath, out var normalization))
+            {
+                var peak = 0f;
+                foreach (var sample in sound.Samples) peak = Math.Max(peak, Math.Abs(sample));
+                normalization = Math.Min(normalization, .85f / Math.Max(.0001f, peak));
+                for (int k = 0; k < sound.Samples.Length; k++) sound.Samples[k] *= normalization;
+            }
+            // Offline audit only: independent templates taken before the mix.
+            if (spectralJoinReview is { } review && activeTrack is not null &&
+                advance >= OutputSampleRate * 17 / 1000 &&
+                sound.Samples.Length >= OutputSampleRate * 110 / 1000)
+            {
+                var at = result.Count - advance;
+                var context = OutputSampleRate * 110 / 1000;
+                if (at >= context)
+                    review.Add(new(at, advance, reading[i].Alias!,
+                        CollectionsMarshal.AsSpan(result).Slice(at - context, context).ToArray(),
+                        sound.Samples.AsSpan(0, Math.Min(sound.Samples.Length, context)).ToArray()));
+            }
             var continuousJoin = activeTrack is null && simpleRendering && SimpleVoicedJoinsEnabled && voicedLead && advance > 0 &&
                 UtauVoicedJoin.TryBlend(CollectionsMarshal.AsSpan(result)[^advance..], sound.Samples.AsSpan(0, advance),
                     previousVowel, sound.Overlap, previousPeriod, sound.Period, ct);
-            // A successful join already mixed the intersection in place.
+            if (activeTrack is not null && SimpleComplementaryEnvelopeEnabled && SimpleRetunedVoicedJoinEnabled && voicedLead && advance > 0)
+                UtauVoicedJoin.TryAlignRetunedTail(CollectionsMarshal.AsSpan(result)[^advance..], sound.Samples.AsSpan(0, advance), ct);
+            if (levelJoins && !continuousJoin && (advance == 0 || voicedLead) && previousVowel > 0 &&
+                reading[i].Alias is { Length: > 0 } nextAlias &&
+                "あいうえおをまみむめもなにぬねのらりるれろやゆよわん".Contains(nextAlias[0]))
+                UtauHeadProtectedJoin.Apply(CollectionsMarshal.AsSpan(result), sound.Samples, advance,
+                    previousVowel, previousPeriod, sound.Period, utteranceVoiceTuning.MaximumHeadCut, ct);
+            // A successful legacy join already mixed the intersection in place.
             var start = Append(result, sound.Samples, advance, fadeOverlap, continuousJoin,
                 complementary: activeTrack is not null && SimpleComplementaryEnvelopeEnabled,
                 adaptiveLead: activeTrack is not null && SimpleLeadHandoffEnabled && !voicedLead);
@@ -747,10 +822,13 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
                     start, advance, fadeOverlap, voicedLead, vowelCarry && !voicedLead && sound.Overlap < advance, ct));
             timingAnchors?.Add(new(i, reading[i].Alias, '\0', reading[i].Extensions,
                 start, start + (sound.MappedVowelOnset ?? sound.Preutterance), start + sound.Samples.Length));
+            mouthAnchors?.Add(new(i, reading[i].Alias, '\0', reading[i].Extensions,
+                start, start + (sound.MappedVowelOnset ?? sound.Preutterance), start + sound.Samples.Length));
             previousVowel = sound.Samples.Length - sound.Preutterance;
             previousPeriod = sound.Period;
         }
         if (result.Count == 0 || result.All(x => Math.Abs(x) < 0.0001f)) throw new InvalidDataException("音源から有効な音声を生成できません。");
+        if (mouthShape) UtauMouthContour.Apply(CollectionsMarshal.AsSpan(result), mouthAnchors!, ct);
         // One gain for the utterance preserves the bank's relative consonant/vowel
         // levels. Summed transitions receive headroom without per-mora pumping.
         // A streaming continuation cannot know the peak of future phrases.
@@ -769,7 +847,8 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
             for (var i = 0; i < fade; i++) result[i] *= Fade(i, fade);
         if (prefetch is not { Last: false })
             for (var i = 0; i < fade; i++) result[^(i + 1)] *= Fade(i, fade);
-        return new(QuantizePcm(result), OutputSampleRate);
+        var pcm = QuantizePcm(result);
+        return new(pcm, OutputSampleRate);
     }
 
     private static float OutputPeak(List<float> result)
@@ -979,6 +1058,15 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
         return median;
     }
 
+    private static bool CanRetimeStableTail(InspectedMoraSource source, CancellationToken ct)
+    {
+        const int width = OutputSampleRate * 32 / 1000;
+        if (source.Period <= 0 || source.Stable < source.Pre || source.End - source.Start - source.Stable < width)
+            return false;
+        var window = source.Samples.AsSpan(source.Start + source.Stable, width);
+        return UtauPitch.IsContinuouslyVoiced(window, source.Period, ct);
+    }
+
     private Mora RenderMora(Voicebank bank, OtoEntry oto, int extensions, CancellationToken ct, int? plannedDurationSamples = null,
         UtauLandmarkOverride? landmark = null, int? plannedLeadSamples = null, UnitDiagnosticCapture? diagnostic = null, bool retainFriction = false, bool retainNextSource = false, InspectedMoraSource? sourceOverride = null, int? startOverride = null)
     {
@@ -1033,6 +1121,8 @@ public sealed partial class UtauSpeech(IPcmOutput output, IUtauPcmPostprocessor?
             }
         }
         var vowelEnd = stable + tail;
+        if (simpleRendering && SimpleSilentTailEnabled && landmark is null && Vowel(oto.Alias) is not null)
+            vowelEnd = UtauSilentSourceTail.EffectiveLength(source.AsSpan(start, vowelEnd), stable, period, ct);
         double energy = 0;
         for (var i = start + stable; i < start + vowelEnd; i++) energy += (double)source[i] * source[i];
         if (energy / (vowelEnd - stable) < 0.00000001) throw new InvalidDataException("原音の母音部分が無音です。");

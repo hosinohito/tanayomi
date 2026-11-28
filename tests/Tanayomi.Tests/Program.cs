@@ -16,6 +16,37 @@ internal static class Program
     {
         try
         {
+            if (args.Length == 1 && args[0] == "--utau-protected-join-check")
+            {
+                UtauProtectedJoinTests.RunAsync(Check).GetAwaiter().GetResult();
+                UtauProtectedJoinTests.VerifyTailAndMouthAsync(Check).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} protected join checks");
+                return 0;
+            }
+            if (args.Length == 2 && args[0] == "--utau-mouth-level-review")
+            {
+                UtauMouthReview.RunAsync(args[1], Check, equalize: true).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} mouth level review checks");
+                return 0;
+            }
+            if (args.Length == 2 && args[0] == "--utau-mouth-review")
+            {
+                UtauMouthReview.RunAsync(args[1], Check).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} mouth review checks");
+                return 0;
+            }
+            if (args.Length == 2 && args[0] == "--utau-level-review")
+            {
+                UtauLevelReview.RunAsync(args[1], Check).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} level review checks");
+                return 0;
+            }
+            if (args.Length == 3 && args[0] == "--utau-spectral-join-audit")
+            {
+                UtauSpectralJoinAudit.RunAsync(args[1], args[2], Check).GetAwaiter().GetResult();
+                Console.WriteLine($"PASS: {passed} spectral join checks");
+                return 0;
+            }
             if (args.Length == 1 && args[0] == "--utau-mode-menu-check")
             {
                 UtauModeMenuTests.RunAsync(Check).GetAwaiter().GetResult();
@@ -236,6 +267,8 @@ internal static class Program
         await UtauModeMenuTests.RunAsync(Check);
         await UtauSimplePrefetchTests.RunAsync(Check);
         await UtauVoiceTuningTests.RunAsync(Check);
+        await UtauProtectedJoinTests.RunAsync(Check);
+        await UtauProtectedJoinTests.VerifyTailAndMouthAsync(Check);
         await UtauVoicedJoinTests.RunAsync(Check);
         await UtauContinuousPitchTests.RunAsync(Check);
         await UtauOverlapEnvelopeTests.RunAsync(Check, null);
@@ -405,10 +438,45 @@ internal static class Program
                 Check(model.UtauVoiceFormant == -45 && model.UtauVoiceBreath == 60,
                     "g and B sliders update the view-model independently");
                 Check(model.UtauVoicePitch == 4 && model.UtauVoiceRange == 150, "both voice tuning sliders update the view-model");
+                view.FindControl<Expander>("UtauPitchCurvePanel")!.IsExpanded = true;
+                Dispatcher.UIThread.RunJobs();
+                var curveSliders = new[] { "Start", "Early", "Middle", "Late", "End" }
+                    .Select(point => view.FindControl<Slider>($"UtauCurve{point}Slider")!).ToArray();
+                var curvePoints = new[] { -2.5, -1.0, 3.0, 1.5, 0.5 };
+                for (var i = 0; i < curveSliders.Length; i++) curveSliders[i].Value = curvePoints[i];
+                var boundarySlider = view.FindControl<Slider>("UtauBoundaryRangeSlider")!;
+                boundarySlider.Value = 60;
+                pitchSlider.Value = 2;
+                Check(model.UtauVoiceBoundaryRange == 60 && model.UtauVoiceRange == 150,
+                    "lexical and question-ending controls are independent in the UI");
+                Dispatcher.UIThread.RunJobs();
+                Check(new[] { model.UtauCurveStart, model.UtauCurveEarly, model.UtauCurveMiddle, model.UtauCurveLate, model.UtauCurveEnd }
+                    .SequenceEqual(curvePoints) && curveSliders.Select(x => x.Value).SequenceEqual(curvePoints),
+                    "five pitch curve sliders bind independently and survive a change to overall pitch");
+                var curveToggle = view.FindControl<CheckBox>("UtauCurveEnabledToggle")!;
+                var curvePanel = view.FindControl<Expander>("UtauPitchCurvePanel")!;
+                curveToggle.IsChecked = false;
+                Dispatcher.UIThread.RunJobs();
+                Check(!model.UtauVoiceCurveEnabled && !curvePanel.IsEnabled && model.UtauCurveMiddle == 3 &&
+                    model.UtauVoiceRange == 150 && model.UtauVoiceBoundaryRange == 60,
+                    "curve toggle only disables the manual editor while retaining the points and automatic controls");
+                var joinToggle = view.FindControl<CheckBox>("UtauLevelJoinsToggle")!;
+                var headCut = view.FindControl<Slider>("UtauMaximumHeadCutSlider")!;
+                Check(joinToggle.IsChecked == false && !headCut.IsEffectivelyEnabled && headCut.Value == 15,
+                    "the experimental join is initially off with a 15 percent head limit");
+                joinToggle.IsChecked = true;
+                Dispatcher.UIThread.RunJobs();
+                headCut.Value = 0;
+                pitchSlider.Value = -2;
+                Dispatcher.UIThread.RunJobs();
+                Check(headCut.IsEffectivelyEnabled && model.UtauLevelJoins && model.UtauMaximumHeadCut == 0,
+                    "enabling the join exposes a head cut limit that survives edits to pitch");
                 view.FindControl<Button>("UtauVoiceReset")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
                 Dispatcher.UIThread.RunJobs();
-                Check(pitchSlider.Value == 0 && rangeSlider.Value == 100 && formantSlider.Value == 0 && breathSlider.Value == 0,
-                    "voice tuning reset restores all four slider defaults");
+                Check(joinToggle.IsChecked == false && headCut.Value == 15, "reset restores the join controls");
+                Dispatcher.UIThread.RunJobs();
+                Check(pitchSlider.Value == 0 && rangeSlider.Value == 100 && formantSlider.Value == 0 && breathSlider.Value == 0 && boundarySlider.Value == 100 && curveToggle.IsChecked == true && curveSliders.Select(x => x.Value).SequenceEqual(new[] { 0.5, 0.5, 0.0, -0.5, -1.0 }),
+                    "voice tuning reset restores all voice controls including the five curve points");
                 modeSelector.SelectedItem = model.UtauModes.Single(x => x.Mode == UtauSynthesisMode.PhaseVocoder);
                 Dispatcher.UIThread.RunJobs();
                 Check(!tuningPanel.IsVisible, "voice tuning panel is hidden for the other engine");

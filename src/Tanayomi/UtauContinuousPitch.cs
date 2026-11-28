@@ -12,7 +12,9 @@ internal sealed class UtauContinuousPitch
         var grid = new List<double>();
         var baseHz = Rate / basePeriod;
         var pitch = tuning?.Pitch ?? 0;
-        var range = (tuning?.Range ?? 100) / 100.0;
+        var lexicalRange = (tuning?.Range ?? 100) / 100.0;
+        var boundaryRange = (tuning?.BoundaryRange ?? 100) / 100.0;
+        var curve = tuning is { CurveEnabled: false } ? default : tuning?.Curve ?? UtauPitchCurve.Default;
         if (length < 1 || basePeriod is < 60 or > 490 || !double.IsFinite(basePeriod))
             throw new ArgumentOutOfRangeException(nameof(basePeriod));
         for (double sample = 0; sample < length; sample += Rate / HertzAt(sample))
@@ -25,9 +27,9 @@ internal sealed class UtauContinuousPitch
         double HertzAt(double at)
         {
             var t = Math.Clamp(at / Math.Max(1, length - 1), 0, 1);
-            var semitones = 0.45 - 1.25 * Ease(t);
-            if (question) semitones += 2.0 * Ease(Math.Clamp((t - 0.65) / 0.35, 0, 1));
-            if (accentEdges is { Length: > 0 })
+            var boundary = question ? 2.0 * Ease(Math.Clamp((t - 0.65) / 0.35, 0, 1)) * boundaryRange : 0;
+            var lexical = 0d;
+            if (lexicalRange != 0 && accentEdges is { Length: > 0 })
             {
                 var middle = Array.BinarySearch(accentEdges, (int)at);
                 var next = middle < 0 ? ~middle : middle;
@@ -39,9 +41,12 @@ internal sealed class UtauContinuousPitch
                 var value = (best & 1) == 0
                     ? Ease(Math.Clamp((at - accentEdges[best]) / (Rate * 0.065) + 0.5, 0, 1))
                     : 1 - Ease(Math.Clamp((at - accentEdges[best]) / (Rate * 0.065) + 0.5, 0, 1));
-                semitones += 1.8 * value;
+                lexical = 1.8 * value * lexicalRange;
             }
-            return baseHz * Math.Pow(2, (pitch + semitones * range) / 12);
+            // The sliders alone define the base line. Accent and question
+            // inflection are separate, and never change the saved curve.
+            var target = pitch + curve.SemitonesAt(t) + lexical + boundary;
+            return baseHz * Math.Pow(2, target / 12);
         }
         static double Ease(double t) => t * t * (3 - 2 * t);
     }

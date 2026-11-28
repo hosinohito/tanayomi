@@ -63,9 +63,14 @@
                 <TextBlock Grid.Column="2" Text="{Binding UtauVoicePitchLabel}" VerticalAlignment="Center" MinWidth="50" />
               </Grid>
               <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-                <TextBlock Text="抑揚の幅" VerticalAlignment="Center" />
+                <TextBlock Text="単語のアクセント" VerticalAlignment="Center" />
                 <Slider x:Name="UtauRangeSlider" Grid.Column="1" Minimum="0" Maximum="200" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding UtauVoiceRange, Mode=TwoWay}" />
                 <TextBlock Grid.Column="2" Text="{Binding UtauVoiceRangeLabel}" VerticalAlignment="Center" MinWidth="50" />
+              </Grid>
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <TextBlock Text="疑問文の語尾" VerticalAlignment="Center" />
+                <Slider x:Name="UtauBoundaryRangeSlider" Grid.Column="1" Minimum="0" Maximum="200" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding UtauVoiceBoundaryRange, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding UtauVoiceBoundaryRangeLabel}" VerticalAlignment="Center" MinWidth="50" />
               </Grid>
               <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                 <TextBlock Text="声の太さ（g）" VerticalAlignment="Center" />
@@ -78,6 +83,43 @@
                 <TextBlock Grid.Column="2" Text="{Binding UtauVoiceBreathLabel}" VerticalAlignment="Center" MinWidth="50" />
               </Grid>
               <TextBlock Text="次の発言から反映。太さは左で細く、右で太くなります。息っぽさは右ほど母音に息が混ざります。" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+              <CheckBox x:Name="UtauLevelJoinsToggle" Content="音源と有声音のつなぎ目の音量をそろえる" IsChecked="{Binding UtauLevelJoins, Mode=TwoWay}" />
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" IsEnabled="{Binding UtauLevelJoins}">
+                <TextBlock Text="次の音の頭を下げる上限" VerticalAlignment="Center" />
+                <Slider x:Name="UtauMaximumHeadCutSlider" Grid.Column="1" Minimum="0" Maximum="50" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding UtauMaximumHeadCut, Mode=TwoWay}" />
+                <TextBlock Grid.Column="2" Text="{Binding UtauMaximumHeadCutLabel}" VerticalAlignment="Center" MinWidth="50" />
+              </Grid>
+              <CheckBox x:Name="UtauCurveEnabledToggle" Content="抑揚カーブを使う" IsChecked="{Binding UtauVoiceCurveEnabled, Mode=TwoWay}" />
+              <Expander x:Name="UtauPitchCurvePanel" Header="抑揚カーブ" IsEnabled="{Binding UtauVoiceCurveEnabled}" HorizontalAlignment="Stretch">
+                <StackPanel Spacing="5" Margin="0,6,0,0">
+                  <TextBlock Text="句の長さに合わせて5点を配置します。すべて0にするとカーブは平らになります。単語のアクセントと疑問文の語尾は別々に調整できます。" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="88,*,Auto" ColumnSpacing="8">
+                    <TextBlock Text="句頭 (0%)" VerticalAlignment="Center" />
+                    <Slider x:Name="UtauCurveStartSlider" Grid.Column="1" Minimum="-3" Maximum="3" TickFrequency="0.5" SmallChange="0.5" IsSnapToTickEnabled="True" AutomationProperties.Name="句頭 (0%)の音程補正" Value="{Binding UtauCurveStart, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="{Binding UtauCurveStartLabel}" VerticalAlignment="Center" MinWidth="62" />
+                  </Grid>
+                  <Grid ColumnDefinitions="88,*,Auto" ColumnSpacing="8">
+                    <TextBlock Text="序盤 (25%)" VerticalAlignment="Center" />
+                    <Slider x:Name="UtauCurveEarlySlider" Grid.Column="1" Minimum="-3" Maximum="3" TickFrequency="0.5" SmallChange="0.5" IsSnapToTickEnabled="True" AutomationProperties.Name="序盤 (25%)の音程補正" Value="{Binding UtauCurveEarly, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="{Binding UtauCurveEarlyLabel}" VerticalAlignment="Center" MinWidth="62" />
+                  </Grid>
+                  <Grid ColumnDefinitions="88,*,Auto" ColumnSpacing="8">
+                    <TextBlock Text="中盤 (50%)" VerticalAlignment="Center" />
+                    <Slider x:Name="UtauCurveMiddleSlider" Grid.Column="1" Minimum="-3" Maximum="3" TickFrequency="0.5" SmallChange="0.5" IsSnapToTickEnabled="True" AutomationProperties.Name="中盤 (50%)の音程補正" Value="{Binding UtauCurveMiddle, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="{Binding UtauCurveMiddleLabel}" VerticalAlignment="Center" MinWidth="62" />
+                  </Grid>
+                  <Grid ColumnDefinitions="88,*,Auto" ColumnSpacing="8">
+                    <TextBlock Text="終盤 (75%)" VerticalAlignment="Center" />
+                    <Slider x:Name="UtauCurveLateSlider" Grid.Column="1" Minimum="-3" Maximum="3" TickFrequency="0.5" SmallChange="0.5" IsSnapToTickEnabled="True" AutomationProperties.Name="終盤 (75%)の音程補正" Value="{Binding UtauCurveLate, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="{Binding UtauCurveLateLabel}" VerticalAlignment="Center" MinWidth="62" />
+                  </Grid>
+                  <Grid ColumnDefinitions="88,*,Auto" ColumnSpacing="8">
+                    <TextBlock Text="句末 (100%)" VerticalAlignment="Center" />
+                    <Slider x:Name="UtauCurveEndSlider" Grid.Column="1" Minimum="-3" Maximum="3" TickFrequency="0.5" SmallChange="0.5" IsSnapToTickEnabled="True" AutomationProperties.Name="句末 (100%)の音程補正" Value="{Binding UtauCurveEnd, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="{Binding UtauCurveEndLabel}" VerticalAlignment="Center" MinWidth="62" />
+                  </Grid>
+                </StackPanel>
+              </Expander>
               <Button x:Name="UtauVoiceReset" Content="既定値に戻す" Click="ResetUtauVoiceTuning" HorizontalAlignment="Left" />
             </StackPanel>
           </Expander>
@@ -109,6 +151,7 @@
               <StackPanel Spacing="10" IsEnabled="{Binding TextSettingsReady}">
                 <CheckBox Content="発言者の名前も読む" IsChecked="{Binding ReadAuthorNames}" />
                 <CheckBox Content="話者が変わったときだけ名前を読む" IsEnabled="{Binding ReadAuthorNames}" IsChecked="{Binding NamesOnChange}" />
+                <CheckBox Content="発言者の名前を本文の後に読む" IsEnabled="{Binding ReadAuthorNames}" IsChecked="{Binding NameAfterBody}" />
                 <TextBlock Text="チャット本文の読み上げ文字数" />
                 <TextBox Text="{Binding BodyLimitText}" PlaceholderText="1～180（空欄は既定）" />
                 <CheckBox Content="名前のローマ字をかなに変換" IsChecked="{Binding RomajiNames}" />
@@ -130,6 +173,8 @@
                 <TextBox Text="{Binding ReplacementRulesText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="76" MaxLength="65536" />
                 <TextBlock Text="読み上げ除外：Twitch:ユーザーID、またはYouTube:チャンネルID（1行1件）。行を消すと解除できます。" TextWrapping="Wrap" Classes="muted" FontSize="12" />
                 <TextBox Text="{Binding MutedRulesText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxLength="65536" />
+                <TextBlock Text="本文の読み上げ除外（正規表現）：1行に1件。本文が一致すると名前も読みません。" TextWrapping="Wrap" />
+                <TextBox Text="{Binding MutedBodyPatternsText}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" MaxLength="4128" />
                 <Button Content="保存して適用" Click="ApplyTextSettings" HorizontalAlignment="Left" />
               </StackPanel>
               <TextBlock Text="{Binding TextSettingsStatus}" TextWrapping="Wrap" Classes="muted" />

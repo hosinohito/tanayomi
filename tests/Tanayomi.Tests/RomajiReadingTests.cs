@@ -7,7 +7,8 @@ public static class RomajiReadingTests
         void Reads(string input, string expected, string reason) => check(RomajiReading.Convert(input) == expected, reason);
         Reads("konnichiha arigatou", "こんにちは ありがとう", "romaji converts complete common words");
         Reads("SHINJUKU Tokyo tanaka", "SHINJUKU ときょ たなか", "romaji preserves uppercase acronyms and accepts mixed case without inferring English");
-        Reads("shi chi tsu fu ji ai neko", "shi chi tsu fu ji ai ねこ", "romaji preserves tokens shorter than four ASCII letters");
+        Reads("ra ri ru re ro shi chi tsu fu ji ai inu neko", "ら り る れ ろ し ち つ ふ じ あい いぬ ねこ", "romaji converts short lowercase syllables and words");
+        Reads("a n RA Ra OK ok PC pc ra2 ra_id https://host/ra", "a n RA Ra OK ok PC pc ra2 ra_id https://host/ra", "short romaji keeps single letters, abbreviations, incomplete words, identifiers and URLs");
         Reads("shichitsufujisa", "しちつふじさ", "romaji supports Hepburn digraphs");
         Reads("sitituhuzi didu", "しちつふじ ぢづ", "romaji supports common Kunrei-compatible syllables");
         Reads("kyakyukyogyagyugyo", "きゃきゅきょぎゃぎゅぎょ", "romaji supports voiced and unvoiced palatalized syllables");

@@ -64,7 +64,11 @@ public static class RomajiReading
             letters++;
             if (c is >= 'a' and <= 'z') allUpper = false;
         }
-        if (letters < 4 || allUpper) return false;
+        if (letters < 2 || allUpper) return false;
+        // Short lowercase romaji (e.g. ra, shi) is valid; keep short mixed-case abbreviations.
+        if (letters < 4)
+            foreach (var c in token)
+                if (c is >= 'A' and <= 'Z') return false;
         var lower = token.ToString().ToLowerInvariant();
         var result = new StringBuilder(lower.Length);
         for (var i = 0; i < lower.Length;)

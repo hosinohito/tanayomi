@@ -23,6 +23,19 @@ internal static class UtauVoicedJoinTests
                 "closure, short or incompatible joins leave the old path untouched");
         }
 
+        var phaseTail = outgoing.ToArray();
+        var phaseIncoming = incoming.ToArray();
+        check(UtauVoicedJoin.TryAlignRetunedTail(phaseTail, phaseIncoming, default) &&
+            phaseTail[0] == outgoing[0] && phaseTail[^1] == outgoing[^1] && phaseIncoming.SequenceEqual(incoming),
+            "retuned join aligns only the middle of the outgoing overlap");
+        double MixedEnergy(float[] tail) => Enumerable.Range(center - 60, 120)
+            .Select(i => (tail[i] + incoming[i]) * 0.5).Sum(v => v * v);
+        check(MixedEnergy(phaseTail) > 20 && MixedEnergy(outgoing) < 0.01,
+            "retuned phase join prevents the synthetic overlap cancellation");
+        var protectedTail = outgoing.ToArray();
+        var silentLead = new float[length];
+        check(!UtauVoicedJoin.TryAlignRetunedTail(protectedTail, silentLead, default) && protectedTail.SequenceEqual(outgoing),
+            "retuned alignment never voices a silent incoming segment");
         using var fixture = new TestDirectory();
         var bank = (await Voicebanks.LoadInstalledAsync(fixture.DirectoryPath))[0];
         await using var before = new UtauSpeech(new NullPcm()) { Voicebank = bank, Mode = UtauSynthesisMode.Simple, SimplePitchContourEnabled = false, SimpleVoicedJoinsEnabled = false };
@@ -44,8 +57,53 @@ internal static class UtauVoicedJoinTests
             }
         }
         check(changed > 0, "new joins are exercised on the bundled CV bank");
+        var changesInFlow = 0;
+        foreach (var statement in new[] { "あいうえお。", "こんにちは。たなよみの読み上げテストです。", "なにぬねの。", "あっか。あさあ。" })
+        {
+            var (old, revised) = (await Retuned(statement, false), await Retuned(statement, true));
+            var changedSamples = old.Zip(revised).Count(pair => pair.First != pair.Second);
+            Console.WriteLine($"Retuned voiced join: {statement} changed={changedSamples}/{old.Length}");
+            check(old.Length == revised.Length, "retuned voiced join preserves phrase lengths");
+            if (statement == "あっか。あさあ。")
+                check(changedSamples == 0 && HasZeroRun(revised, 44100 * 85 / 1000),
+                    "the actual closure and fricative controls stay bit-identical");
+            else if (changedSamples > 0)
+            {
+                changesInFlow++;
+                var changedAt = Enumerable.Range(0, old.Length).Where(i => old[i] != revised[i]).ToArray();
+                var centerOfEdit = changedAt[changedAt.Length / 2];
+                const int frame = 220; // 5 ms
+                var start = Math.Max(0, centerOfEdit - frame / 2);
+                var beforeRms = Rms(old, start, frame);
+                var afterRms = Rms(revised, start, frame);
+                var localGain = 20 * Math.Log10(afterRms / beforeRms);
+                Console.WriteLine($"Retuned center {centerOfEdit * 1000.0 / 44100:F1} ms: RMS {beforeRms:F1} -> {afterRms:F1} ({localGain:+0.0;-0.0;0.0} dB)");
+                check(localGain >= 0.5 && localGain <= 10, "actual retuned crossover gains energy without an excessive increase");
+            }
+        }
+        check(changesInFlow > 0, "retuned join is exercised in actual streaming CV audio");
+        async Task<short[]> Retuned(string text, bool enabled)
+        {
+            var sink = new NullPcm();
+            await using var speaker = new UtauSpeech(sink)
+            {
+                Voicebank = bank, Mode = UtauSynthesisMode.Simple, SimplePitchContourEnabled = true,
+                SimpleSourceAnchoredPitchEnabled = true, SimpleRetunedVoicedJoinEnabled = enabled,
+                SimpleComplementaryEnvelopeEnabled = true, SimplePrefetchEnabled = true
+            };
+            await speaker.SpeakAsync(text, default);
+            return sink.Parts.SelectMany(x => x).ToArray();
+        }
+        await UtauSimpleRhythmTests.RunAsync(check, bank);
         var sokuon = await after.SynthesizeAsync("あっか");
         check(HasZeroRun(sokuon.Samples, 44100 * 85 / 1000), "85 ms sokuon closure survives");
+    }
+
+    private static double Rms(short[] pcm, int start, int count)
+    {
+        double power = 0;
+        foreach (var sample in pcm.AsSpan(start, count)) power += (double)sample * sample;
+        return Math.Sqrt(power / count);
     }
 
     private static bool HasZeroRun(short[] samples, int minimum)
@@ -61,7 +119,12 @@ internal static class UtauVoicedJoinTests
 
     private sealed class NullPcm : IPcmOutput
     {
-        public Task PlayAsync(ReadOnlyMemory<short> samples, int rate, CancellationToken ct) => Task.CompletedTask;
+        internal List<short[]> Parts { get; } = [];
+        public Task PlayAsync(ReadOnlyMemory<short> samples, int rate, CancellationToken ct)
+        {
+            Parts.Add(samples.ToArray());
+            return Task.CompletedTask;
+        }
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

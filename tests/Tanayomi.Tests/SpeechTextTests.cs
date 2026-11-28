@@ -5,6 +5,36 @@ public static class SpeechTextTests
 {
     public static Task RunAsync(Action<bool, string> check)
     {
+        var filter = new SpeechText(new(NameReadingMode.EveryMessage,
+            replacements: [new("!", "removed")], mutedBodyPatterns: ["^!", @"\bSPAM[0-9]+\b"]));
+        var skipped = filter.Prepare("Twitch", "42", "話者", "!test");
+        check(skipped.IsMuted && skipped.Text == "", "body pattern matches original input and suppresses body and author");
+        check(filter.Prepare("YouTube", "43", "話者", "text SPAM17").IsMuted, "another expression may match within the body");
+        check(filter.Prepare("Twitch", "42", "話者", " !test").Text == "話者、removedtest",
+            "anchored expression respects leading space in original message");
+        check(filter.Prepare("Twitch", "42", "話者", "hello!").Text == "話者、helloremoved",
+            "non-matching messages still read author and transformed body");
+        try
+        {
+            _ = new SpeechTextSettings(mutedBodyPatterns: Enumerable.Repeat("^x", SpeechTextSettings.MaximumBodyPatterns + 1));
+            check(false, "body rules are bounded");
+        }
+        catch (ArgumentException error) { check(error.ParamName == "mutedBodyPatterns", "body rules are bounded"); }
+        var repeated = new SpeechText(new(mutedBodyPatterns: ["^(a+)+b$"]));
+        check(!repeated.Prepare("Twitch", "42", "話者", new string('a', SpeechText.MaximumInputScalars)).IsMuted,
+            "nested repetition on maximum-length non-matching input does not block or drop the message");
+
+        var suffix = new SpeechText(new(NameReadingMode.OnSpeakerChange, bodyLimit: 3, nameAfterBody: true));
+        var suffixName = suffix.Prepare("Twitch", "42", "話者", "本文です");
+        check(suffixName.Text == "本文で、以下省略、話者" && suffixName.IsTruncated,
+            "suffix name follows the body and its omission marker");
+        var longBody = new SpeechText(new(NameReadingMode.EveryMessage, nameAfterBody: true))
+            .Prepare("Twitch", "42", "話者", new string('あ', SpeechText.MaximumSpokenScalars));
+        check(longBody.IsTruncated && longBody.Text.EndsWith("、以下省略、話者", StringComparison.Ordinal),
+            "total speech limit reserves space for the suffix name");
+        check(suffix.Prepare("Twitch", "42", "話者", "試し読み", isManual: true).Text == "試し読み",
+            "manual speech never gets a suffix speaker name");
+
         var plain = new SpeechText();
         check(plain.Prepare("Twitch", "1", "hoshinohito", "konnichiha").Text == "konnichiha", "romaji conversion remains opt-in");
         var romaji = new SpeechText(new(NameReadingMode.EveryMessage,
@@ -18,6 +48,8 @@ public static class SpeechTextTests
             "name romaji can be enabled independently of the body");
         check(new SpeechText(new(NameReadingMode.EveryMessage, romajiBody: true)).Prepare("Twitch", "1", "hoshinohito", "konnichiha").Text == "hoshinohito、こんにちは",
             "body romaji can be enabled independently of author names");
+        check(new SpeechText(new(NameReadingMode.Off, romajiBody: true)).Prepare("Twitch", "1", "speaker", "ra　").Text == "ら",
+            "opt-in chat body converts ra before speech synthesis");
         check(plain.Prepare("Twitch", "42", "表示名", "こんにちは").Text == "こんにちは", "speech names remain off by default");
         check(plain.Prepare("Twitch", null, "name", " A\0\tB\nHTTPS://example.test/隣接  C ").Text == "A B リンク C",
             "speech normalization preserves existing URL and whitespace behavior");

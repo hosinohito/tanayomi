@@ -12,7 +12,7 @@ public static class JapaneseReading
     private sealed record DictionaryData(Word[] Words, short[] Transitions, int Width, int MaximumWordLength);
     private static readonly Lazy<DictionaryData> Data = new(Load);
     private static readonly Lazy<byte[]> AccentData = new(LoadAccents);
-    internal readonly record struct AccentSpan(int Offset, string Reading, int Drop, int MoraCount);
+    internal readonly record struct AccentSpan(int Offset, string Reading, int Drop, int MoraCount, bool IsEmbeddedKana, bool HasFollowingParticle);
 
     internal static (string Reading, IReadOnlyList<AccentSpan> Accents) ToAccentReading(string text, CancellationToken ct)
     {
@@ -80,6 +80,7 @@ public static class JapaneseReading
         return reading;
     }
 
+    private static bool IsHiragana(char c) => c is >= 'ぁ' and <= 'ゖ' or 'ー';
     private static bool IsJapanese(char c) => c is >= '\u3041' and <= '\u30ff' or >= '\u3400' and <= '\u9fff' or '々' or '〆' or '〇';
     internal static string Hiragana(string value) => string.Concat(value.Select(c => c is >= 'ァ' and <= 'ヶ' ? (char)(c - 0x60) : c));
 
@@ -137,16 +138,22 @@ public static class JapaneseReading
         var last = end.MinBy(n => n.Cost + data.Transitions[n.Right * data.Width])!;
         var pieces = new Stack<Node>();
         for (var node = last; node.Previous is not null; node = node.Previous) pieces.Push(node);
-        foreach (var node in pieces)
+        var surfaceOffset = 0;
+        while (pieces.TryPop(out var node))
         {
             if (accents is null) { output.Append(node.Reading); continue; }
+            var surface = node.WordIndex >= 0 ? data.Words[node.WordIndex].Surface : node.Reading;
+            var embeddedKana = surfaceOffset > 0 && IsHiragana(text[surfaceOffset - 1]) && surface.All(IsHiragana);
+            var hasParticle = pieces.TryPeek(out var following) && following.WordIndex >= 0 &&
+                data.Words[following.WordIndex].Surface is "が" or "を" or "の" or "に" or "は" or "も";
+            surfaceOffset += surface.Length;
             var reading = Hiragana(node.Reading).Replace("’", "", StringComparison.Ordinal).Replace("'", "", StringComparison.Ordinal);
             if (node.WordIndex >= 0)
             {
                 var accent = AccentData.Value;
                 var at = node.WordIndex * 2;
                 if (accent[at] != 255)
-                    accents.Add(new(output.Length, reading, accent[at], accent[at+1]));
+                    accents.Add(new(output.Length, reading, accent[at], accent[at+1], embeddedKana, hasParticle));
             }
             output.Append(reading);
         }

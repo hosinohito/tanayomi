@@ -17,6 +17,11 @@ internal static class UtauLexicalAccentTests
         check(Profile(fixtures[2]).SequenceEqual(new[] { true,false,false }) &&
             Profile(fixtures[3]).SequenceEqual(new[] { false,true,false }) &&
             Profile(fixtures[4]).SequenceEqual(new[] { false,true,true }), "three patterns distinguish the same reading hashi");
+        check(!Profile("こんにちは。たなよみの読み上げテストです。").Any(x => x),
+            "a dictionary fragment inside an unknown kana name does not create an accent peak");
+        check(Profile("飴が落ちる").Take(3).SequenceEqual(new[] { false, true, true }) &&
+            Profile("雨が降る").Take(3).SequenceEqual(new[] { true, false, false }),
+            "a recognized particle follows the lexical pattern in the middle of a sentence");
         using var dir = new TestDirectory();
         var bank = (await Voicebanks.LoadInstalledAsync(dir.DirectoryPath))[0];
         await using var old = Create(false);
@@ -45,6 +50,23 @@ internal static class UtauLexicalAccentTests
         var scale = (double)stitched.Max(x => Math.Abs((int)x)) / whole.Max(x => Math.Abs((int)x));
         check(sink.Parts.Count == 3 && stitched.Length == whole.Length &&
             stitched.Zip(whole, (a,b) => Math.Abs(a-b*scale)).Max() < 4, "same accents and placements with phrase prefetch");
+        const string sample = "たなよみの読み上げテストです。";
+        await using var reported = Create(true);
+        reported.VoiceTuning = new(0, 100, curve: new UtauPitchCurve(), boundaryRange: 0);
+        var measured = await reported.SynthesizeAsync(sample);
+        var firstYo = Hz(measured, 2 * 7938 + 3000);
+        var secondYo = Hz(measured, 5 * 7938 + 3000);
+        check(Math.Abs(firstYo - secondYo) < 4, $"the two yo sounds in the reported text are no longer separated by a false lexical peak ({firstYo:F0}/{secondYo:F0} Hz)");
+        await using var neutralBoundary = Create(true);
+        await using var raisedBoundary = Create(true);
+        neutralBoundary.VoiceTuning = new(0, 0, curve: new UtauPitchCurve(), boundaryRange: 0);
+        raisedBoundary.VoiceTuning = new(0, 0, curve: new UtauPitchCurve(), boundaryRange: 100);
+        var plainQuestion = await neutralBoundary.SynthesizeAsync("あいうえお？");
+        var raisedQuestion = await raisedBoundary.SynthesizeAsync("あいうえお？");
+        check(plainQuestion.Samples.Length == raisedQuestion.Samples.Length &&
+            Math.Abs(Hz(plainQuestion, 4100) - Hz(raisedQuestion, 4100)) < 3 &&
+            Hz(raisedQuestion, 4 * 7938 + 6000) > Hz(plainQuestion, 4 * 7938 + 6000) + 14,
+            "question-ending strength affects only the late pitch even with lexical accent disabled");
         if (path is null) return;
         foreach (var (name, text) in new[] { ("ame-rain", fixtures[0]), ("ame-candy", fixtures[1]), ("hashi-chopsticks", fixtures[2]),
             ("hashi-bridge", fixtures[3]), ("hashi-edge", fixtures[4]), ("phrase", "明日の朝は雨が降りますか？") })

@@ -10,11 +10,13 @@ internal static class SpeechTextStoreTests
         check((await store.LoadAsync()).NameReading == NameReadingMode.Off, "absent text settings preserve the existing unnamed reading default");
         var settings = new SpeechTextSettings(NameReadingMode.EveryMessage,
             [new("Twitch", "123", "たろう")], [new("API", "えーぴーあい")], [new("YouTube", "other-id")], romajiNames: true, romajiBody: true,
-            suppressRepeatedMessages: true, omitUrls: true);
+            suppressRepeatedMessages: true, omitUrls: true, mutedBodyPatterns: ["^!"]);
         await store.SaveAsync(settings);
         var loaded = await store.LoadAsync();
         check(loaded.RomajiNames && loaded.RomajiBody, "romaji opt-in settings round-trip independently");
         check(loaded.SuppressRepeatedMessages, "optional repeated-message suppression round-trips through settings storage");
+        check(loaded.MutedBodyPatterns.SequenceEqual(["^!"]) && new SpeechText(loaded).Prepare("Twitch", "123", "Name", "!test").IsMuted,
+            "body patterns persist and are revalidated on load");
         check(loaded.OmitUrls, "optional URL omission round-trips through settings storage");
         check(new SpeechText(loaded).Prepare("Twitch", "123", "Changed", "API").Text == "たろう、えーぴーあい" &&
             new SpeechText(loaded).Prepare("YouTube", "other-id", "Name", "text").IsMuted,
@@ -31,6 +33,7 @@ internal static class SpeechTextStoreTests
         var legacy = await store.LoadAsync();
         check(!legacy.RomajiNames && !legacy.RomajiBody, "version-one settings without new fields retain romaji disabled");
         check(!legacy.SuppressRepeatedMessages, "legacy settings do not silently enable repeated-message suppression");
+        check(legacy.MutedBodyPatterns.Count == 0, "legacy settings never silently enable regex exclusion");
         check(!legacy.OmitUrls, "legacy settings preserve reading URLs as links");
         var fullField = string.Concat(Enumerable.Repeat("😀", SpeechTextSettings.MaximumRuleScalars));
         var idPrefix = string.Concat(Enumerable.Repeat("😀", SpeechTextSettings.MaximumRuleScalars - 3));

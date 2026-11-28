@@ -12,6 +12,12 @@ public sealed partial class UtauSpeech
     internal bool SimpleVoicedJoinsEnabled { get; init; } = OperatingSystem.IsWindows() &&
         Environment.GetEnvironmentVariable("TANAYOMI_UTAU_VOICED_JOIN") != "0";
 
+    internal bool SimpleContextRhythmEnabled { get; init; } = OperatingSystem.IsWindows() &&
+        Environment.GetEnvironmentVariable("TANAYOMI_UTAU_CONTEXT_RHYTHM") == "1";
+
+    internal bool SimpleRetunedVoicedJoinEnabled { get; init; } = OperatingSystem.IsWindows() &&
+        Environment.GetEnvironmentVariable("TANAYOMI_UTAU_RETUNED_JOIN") == "1";
+
     internal bool SimplePitchContourEnabled { get; init; } = OperatingSystem.IsWindows() &&
         Environment.GetEnvironmentVariable("TANAYOMI_UTAU_CONTINUOUS_PITCH") != "0";
 

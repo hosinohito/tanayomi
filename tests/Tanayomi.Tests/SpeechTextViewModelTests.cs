@@ -28,6 +28,7 @@ public static class SpeechTextViewModelTests
                 model.MutedRulesText.Length == 0, "new text-settings view model starts with names off and empty rules");
             model.ReadAuthorNames = true;
             model.NamesOnChange = true;
+            model.NameAfterBody = true;
             model.BodyLimitText = "12";
             model.RomajiNames = true;
             model.RomajiBody = true;
@@ -39,6 +40,7 @@ public static class SpeechTextViewModelTests
             model.SelectedAuthor = new("YouTube", "channel-id", "別表示名");
             model.AddMutedAuthor();
             model.ReplacementRulesText = "word=読み\nリンク=URL";
+            model.MutedBodyPatternsText = "^!";
             Apply(model);
             check(model.TextSettingsStatus.Contains("保存しました", StringComparison.Ordinal) && File.Exists(settingsPath),
                 "view-model apply validates and saves text settings into the injected data directory");
@@ -47,7 +49,16 @@ public static class SpeechTextViewModelTests
             check(Speak(model, output, "word https://example.test/a") == "読み",
                 "actual manual speech command uses applied body rules without attaching an author name");
             check(Speak(model, output, "konnichiha") == "こんにちは", "view-model body romaji option reaches the speech queue");
+            model.TestText = "!command";
+            model.SpeakCommand.Execute(null);
+            check(Speak(model, output, "word") == "読み", "configured exclusion prevents the matching message from reaching synthesis");
             saved = File.ReadAllBytes(settingsPath);
+
+            model.MutedBodyPatternsText = "^!\n(?=unsupported)";
+            Apply(model);
+            check(model.TextSettingsStatus.Contains("2 件目", StringComparison.Ordinal) &&
+                File.ReadAllBytes(settingsPath).SequenceEqual(saved), "unsupported regex reports its position and keeps saved settings");
+            model.MutedBodyPatternsText = "^!";
 
             model.ReplacementRulesText = "word=適用しない\n=不正なキー";
             Apply(model);
@@ -87,12 +98,13 @@ public static class SpeechTextViewModelTests
         try
         {
             PumpUntil(() => restarted.TextSettingsReady);
-            check(restarted.NamesOnChange && restarted.BodyLimitText == "12", "restart restores speaker-change mode and optional body limit");
+            check(restarted.NamesOnChange && restarted.NameAfterBody && restarted.BodyLimitText == "12", "restart restores speaker-change mode and optional body limit");
             restarted.BodyLimitText = "181";
             Apply(restarted);
             check(restarted.TextSettingsStatus.Contains("1～180") && File.ReadAllBytes(settingsPath).SequenceEqual(saved),
                 "invalid body limit preserves the last saved settings");
             check(restarted.SuppressRepeatedMessages, "restart restores the selected repeat suppression option");
+            check(restarted.MutedBodyPatternsText == "^!", "restart restores the regex settings field");
             check(restarted.OmitUrls, "restart restores the selected URL omission option");
             check(restarted.ReadAuthorNames && restarted.NameRulesText == "Twitch:42=あき" &&
                 restarted.MutedRulesText == "YouTube:channel-id" && restarted.ReplacementRulesText == "word=読み\nリンク=URL",

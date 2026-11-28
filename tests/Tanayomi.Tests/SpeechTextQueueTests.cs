@@ -43,6 +43,12 @@ public static class SpeechTextQueueTests
             "manual input keeps its normal length and interrupts the run of a chat speaker");
         check(await Read(Message("6", "", "次")) == "表示、次" && await Read(Message("7", "", "次")) == "表示、次",
             "messages without a stable ID never suppress a speaker based only on display name");
+        queue.TextSettings = new(NameReadingMode.OnSpeakerChange, mutedBodyPatterns: ["^[#]"], nameAfterBody: true);
+        check(await Read(Message("suffix1", "C", "本文")) == "本文、表示", "chat queue speaks the author's name after the body");
+        check(!queue.Enqueue(Message("excluded", "D", "#command")), "a regex-matching chat does not enter the speech queue");
+        check(await Read(Message("suffix2", "C", "次")) == "次",
+            "a filtered speaker does not change speaker history when names are read last");
+        check(await Read(Message("suffix3", "D", "本文")) == "本文、表示", "the next audible speaker still gets the suffix name");
     }
 
     private static async Task RepeatDefaultsAndWindowAsync(Action<bool, string> check)

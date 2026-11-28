@@ -60,6 +60,69 @@ internal static class UtauVoicedJoin
         return true;
     }
 
+    // Phase-align only the outgoing, already retuned lead. Keep the
+    // complementary envelope, recorded incoming attack and schedule unchanged.
+    internal static bool TryAlignRetunedTail(Span<float> previous, ReadOnlySpan<float> incoming, CancellationToken ct)
+    {
+        if (previous.Length != incoming.Length || previous.Length < UtauSpeech.OutputSampleRate * 11 / 1000)
+            return false;
+        var center = previous.Length / 2;
+        var radius = Math.Min(center, UtauSpeech.OutputSampleRate * 10 / 1000);
+        var a = previous.Slice(center - radius, radius * 2);
+        var b = incoming.Slice(center - radius, radius * 2);
+        var p = UtauPitch.FindPeriod(a, ct);
+        var q = UtauPitch.FindPeriod(b, ct);
+        if (p <= 0 || q <= 0 || Math.Abs(Math.Log(p / q)) > 0.07 ||
+            !UtauPitch.IsVoiced(a, p) || !UtauPitch.IsVoiced(b, q) ||
+            !HasEvenEnergy(a, (int)Math.Ceiling(p)) || !HasEvenEnergy(b, (int)Math.Ceiling(q)))
+            return false;
+
+        var period = (int)Math.Round(p);
+        var halfWindow = Math.Min(period, center / 2);
+        var at = center - halfWindow;
+        var count = 2 * halfWindow;
+        var maxShift = Math.Min(period / 2 + 1, at);
+        if (count < period || maxShift < 1) return false;
+        var original = Correlation(previous, incoming, at, count, 0);
+        var best = original;
+        var shift = 0;
+        for (var lag = -maxShift; lag <= maxShift; lag++)
+        {
+            if ((lag & 31) == 0) ct.ThrowIfCancellationRequested();
+            var corr = Correlation(previous, incoming, at, count, lag);
+            if (corr > best + 0.002) { best = corr; shift = lag; }
+        }
+        if (best < 0.65 || best - original < 0.15 || shift == 0) return false;
+        var start = Math.Max(maxShift, center - period * 2);
+        var stop = Math.Min(previous.Length - 1 - maxShift, center + period * 2);
+        if (start >= center || stop <= center) return false;
+        ct.ThrowIfCancellationRequested();
+        // In-place interpolation reads only untouched points in its direction.
+        for (var i = shift > 0 ? start : stop; shift > 0 ? i <= stop : i >= start; i += Math.Sign(shift))
+        {
+            var x = i < center ? (i - start) / (double)(center - start) : (stop - i) / (double)(stop - center);
+            var pos = i + shift * x * x * (3 - 2 * x);
+            var j = (int)pos;
+            var sample = previous[j];
+            if (pos > j) sample += (previous[j + 1] - sample) * (float)(pos - j);
+            previous[i] = sample;
+        }
+        return true;
+    }
+
+    private static double Correlation(ReadOnlySpan<float> a, ReadOnlySpan<float> b, int at, int count, int shift)
+    {
+        double aa = 0, bb = 0, ab = 0;
+        for (var i = at; i < at + count; i += 2)
+        {
+            double x = a[i + shift], y = b[i];
+            aa += x * x; bb += y * y; ab += x * y;
+        }
+        // A near-silent or very unbalanced onset is not a phase join candidate.
+        if (aa * bb < 1e-11 || Math.Min(aa, bb) < Math.Max(aa, bb) * 0.035) return -1;
+        return ab / Math.Sqrt(aa * bb);
+    }
+
     private static bool HasEvenEnergy(ReadOnlySpan<float> audio, int cycle)
     {
         double low = double.PositiveInfinity, high = 0;

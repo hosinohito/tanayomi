@@ -21,6 +21,7 @@ public sealed partial class MainViewModel
     private bool readAuthorNames;
     public bool ReadAuthorNames { get => readAuthorNames; set { readAuthorNames = value; Changed(); } }
     public bool NamesOnChange { get; set; }
+    public bool NameAfterBody { get; set; }
     public string BodyLimitText { get; set; } = "";
     public bool RomajiNames { get; set; }
     public bool RomajiBody { get; set; }
@@ -29,6 +30,7 @@ public sealed partial class MainViewModel
     public string NameRulesText { get; set; } = "";
     public string ReplacementRulesText { get; set; } = "";
     public string MutedRulesText { get; set; } = "";
+    public string MutedBodyPatternsText { get; set; } = "";
     private bool textSettingsReady;
     public bool TextSettingsReady { get => textSettingsReady; private set { textSettingsReady = value; Changed(); } }
     private string textSettingsStatus = "";
@@ -44,6 +46,7 @@ public sealed partial class MainViewModel
                 speech.TextSettings = settings;
                 ReadAuthorNames = settings.NameReading != NameReadingMode.Off;
                 NamesOnChange = settings.NameReading == NameReadingMode.OnSpeakerChange;
+                NameAfterBody = settings.NameAfterBody;
                 BodyLimitText = settings.BodyLimit?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "";
                 RomajiNames = settings.RomajiNames;
                 RomajiBody = settings.RomajiBody;
@@ -53,8 +56,10 @@ public sealed partial class MainViewModel
                 ReplacementRulesText = string.Join('\n', settings.Replacements.Select(x => $"{x.Key}={x.Reading}"));
                 MutedRulesText = string.Join('\n', settings.MutedAuthors.Select(x => $"{x.Platform}:{x.AuthorId}"));
                 Changed(nameof(ReadAuthorNames)); Changed(nameof(NameRulesText));
-                Changed(nameof(NamesOnChange)); Changed(nameof(BodyLimitText));
+                Changed(nameof(NamesOnChange)); Changed(nameof(NameAfterBody)); Changed(nameof(BodyLimitText));
                 Changed(nameof(RomajiNames)); Changed(nameof(RomajiBody));
+                MutedBodyPatternsText = string.Join('\n', settings.MutedBodyPatterns);
+                Changed(nameof(MutedBodyPatternsText));
                 Changed(nameof(SuppressRepeatedMessages));
                 Changed(nameof(OmitUrls));
                 Changed(nameof(ReplacementRulesText)); Changed(nameof(MutedRulesText));
@@ -106,7 +111,8 @@ public sealed partial class MainViewModel
             }
             var mode = !ReadAuthorNames ? NameReadingMode.Off : NamesOnChange ? NameReadingMode.OnSpeakerChange : NameReadingMode.EveryMessage;
             var settings = new SpeechTextSettings(mode,
-                names, replacements, muted, RomajiNames, RomajiBody, SuppressRepeatedMessages, OmitUrls, limit);
+                names, replacements, muted, RomajiNames, RomajiBody, SuppressRepeatedMessages, OmitUrls, limit,
+                MutedBodyPatternsText.Split(['\r', '\n']).Where(x => !string.IsNullOrWhiteSpace(x)), NameAfterBody);
             if (textStore is not null) await textStore.SaveAsync(settings, lifetime.Token).ConfigureAwait(false);
             // Saving is atomic. Do not replace active rules if validation or persistence failed.
             speech.TextSettings = settings;
@@ -114,6 +120,10 @@ public sealed partial class MainViewModel
                 "保存しました。次に受信する発言から適用します。", lifetime.Token);
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (ArgumentException error) when (error.ParamName == "mutedBodyPatterns")
+        {
+            OnUi(() => TextSettingsStatus = error.Message.Split('\n')[0] + " 以前の設定を使います。", lifetime.Token);
+        }
         catch (ArgumentException)
         {
             OnUi(() => TextSettingsStatus = "設定の形式、重複、文字数を確認してください。各種類128件、各項目128文字までです。以前の設定を使います。", lifetime.Token);
